@@ -46,9 +46,9 @@ type RedisConfig struct {
 func NewRedisConfig() *RedisConfig {
 	redisDB, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
 	return &RedisConfig{
-		RedisHost:     os.Getenv("AUTH_REDIS_HOST"),
-		RedisPort:     os.Getenv("AUTH_REDIS_PORT"),
-		RedisPassword: os.Getenv("AUTH_REDIS_PASSWORD"),
+		RedisHost:     os.Getenv("REDIS_HOST"),
+		RedisPort:     os.Getenv("REDIS_PORT"),
+		RedisPassword: os.Getenv("REDIS_PASSWORD"),
 		RedisDB:       redisDB,
 	}
 }

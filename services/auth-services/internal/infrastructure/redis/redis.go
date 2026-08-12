@@ -29,6 +29,7 @@ func ConnectRedis(ctx context.Context) error {
 		MaxRetries:      2,
 		MinRetryBackoff: 11 * time.Millisecond,
 		MaxRetryBackoff: 101 * time.Millisecond,
+		ClientName:      "auth-service",
 	})
 
 	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)

@@ -61,3 +61,12 @@ func NewStatusGatewayTimeoutError(message string, details ErrorDetail) *AppError
 		Detail:       details,
 	}
 }
+
+func NewServiceUnavailableError(message string, details ErrorDetail) *AppError {
+	return &AppError{
+		Code:         http.StatusServiceUnavailable,
+		ErrorCode:    "SERVICE_UNAVAILABLE",
+		ErrorMessage: message,
+		Detail:       details,
+	}
+}

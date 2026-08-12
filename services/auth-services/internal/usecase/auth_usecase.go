@@ -118,10 +118,13 @@ func (u *AuthUsecase) Logout(ctx context.Context, token string, request *dto.Ref
 		return errLogoutKeycloak
 	}
 
-	errLogoutRedis := u.repository.BlacklistToken(ctx, token, 1*time.Hour)
+	remainingTTL := helper.CalculateTokenRemainingTTL(token)
 
-	if errLogoutRedis != nil {
-		return helper.NewInternalServerError("Failed to logout user!", helper.ErrorDetail{Detail: errLogoutRedis.Error()})
+	if remainingTTL > 0 {
+		errLogoutRedis := u.repository.BlacklistToken(ctx, token, 1*time.Hour)
+		if errLogoutRedis != nil {
+			return helper.NewInternalServerError("Failed to logout user!", helper.ErrorDetail{Detail: errLogoutRedis.Error()})
+		}
 	}
 
 	return nil

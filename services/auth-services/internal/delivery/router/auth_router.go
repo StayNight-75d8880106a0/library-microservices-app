@@ -12,7 +12,7 @@ import (
 
 func AuthRouter(app *gin.Engine, authController *controller.AuthController, deps *helper.Depedencies, jwks keyfunc.Keyfunc, cfg *config.AppConfig) {
 
-	auth := app.Group("/api/v1")
+	auth := app.Group("/api/v1/auth")
 
 	authMiddleware := middleware.AuthMiddleware(jwks, deps.IsblacklistToken, cfg)
 

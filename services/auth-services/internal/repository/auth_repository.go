@@ -7,6 +7,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const prefixBlacklistKey = "auth:blacklist:"
+
 type AuthRepositoryInterface interface {
 	BlacklistToken(ctx context.Context, token string, expiration time.Duration) error
 	IsTokenBlacklisted(ctx context.Context, token string) bool
@@ -24,15 +26,15 @@ func NewAuthRepositoryRegistry(redisClient *redis.Client) *AuthRepository {
 
 func (repo *AuthRepository) BlacklistToken(ctx context.Context, token string, expiration time.Duration) error {
 
-	errGet := repo.rds.Set(ctx, "blacklist:"+token, "revoked", expiration).Err()
+	errExists := repo.rds.Set(ctx, prefixBlacklistKey+token, "revoked", expiration).Err()
 
-	return errGet
+	return errExists
 
 }
 
 func (repo *AuthRepository) IsTokenBlacklisted(ctx context.Context, token string) bool {
 
-	result, _ := repo.rds.Get(ctx, "blacklist:"+token).Result()
+	result, _ := repo.rds.Get(ctx, prefixBlacklistKey+token).Result()
 
 	return result == "revoked"
 

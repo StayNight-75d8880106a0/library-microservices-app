@@ -49,3 +49,7 @@ Thumbs.db
 *.wmv
 
 .env
+
+README-PRIBADI.md
+
+apisix_conf/
