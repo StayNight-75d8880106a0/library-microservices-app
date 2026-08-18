@@ -29,12 +29,14 @@ func ExtractRoleFromClaims(claims jwt.MapClaims) string {
 		}
 	}
 
+	if userRole["SUPER_ADMIN"] {
+		return "SUPER_ADMIN"
+	}
 	if userRole["ADMIN"] {
-		return "Admin"
-	} else if userRole["USER"] {
-		return "User Public"
-	} else if userRole["Super Admin"] {
-		return "Super Admin"
+		return "ADMIN"
+	}
+	if userRole["USER"] {
+		return "USER"
 	}
 
 	return "USER"

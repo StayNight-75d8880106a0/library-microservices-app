@@ -31,6 +31,10 @@ services:
     container_name: apache-apisix-gateway
     environment:
       AUTH_SERVICE_PORT: ${AUTH_APP_PORT}
+      KEYCLOAK_URL: ${KEYCLOAK_URL}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
     volumes:
       - ./apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ./apisix_conf/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
@@ -122,6 +126,25 @@ services:
     restart: unless-stopped
     ports:
       - ${AUTH_APP_PORT}:${AUTH_APP_PORT}
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  user-management-service:
+    build: 
+      context: ./services/user-management-services
+      dockerfile: Dockerfile
+    image: user-management-service:latest
+    container_name: user-management-service
+    restart: unless-stopped
+    ports:
+      - ${USER_MANAGEMENT_PORT}:${USER_MANAGEMENT_PORT}
     env_file:
       - .env
     depends_on:

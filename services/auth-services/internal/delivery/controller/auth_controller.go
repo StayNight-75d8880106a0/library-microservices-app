@@ -48,7 +48,7 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
-	helper.NewResponseGlobal(ctx, 200, "Success Login!", login, nil)
+	helper.NewResponseGlobal(ctx, 200, "Success Login!", login, nil, nil)
 
 }
 
@@ -77,7 +77,7 @@ func (c *AuthController) Register(ctx *gin.Context) {
 		return
 	}
 
-	helper.NewResponseGlobal(ctx, 201, "Success Create User!", nil, nil)
+	helper.NewResponseGlobal(ctx, 201, "Success Create User!", nil, nil, nil)
 
 }
 
@@ -110,7 +110,7 @@ func (c *AuthController) Logout(ctx *gin.Context) {
 		return
 	}
 
-	helper.NewResponseGlobal(ctx, 200, "Success Logout!", nil, nil)
+	helper.NewResponseGlobal(ctx, 200, "Success Logout!", nil, nil, nil)
 
 }
 
@@ -144,7 +144,7 @@ func (c *AuthController) Me(ctx *gin.Context) {
 		return
 	}
 
-	helper.NewResponseGlobal(ctx, 200, "Success Get Profile!", profile, nil)
+	helper.NewResponseGlobal(ctx, 200, "Success Get Profile!", profile, nil, nil)
 }
 
 func (c *AuthController) RefreshToken(ctx *gin.Context) {
@@ -172,5 +172,5 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
-	helper.NewResponseGlobal(ctx, 200, "Success Refresh Token!", refresh, nil)
+	helper.NewResponseGlobal(ctx, 200, "Success Refresh Token!", refresh, nil, nil)
 }

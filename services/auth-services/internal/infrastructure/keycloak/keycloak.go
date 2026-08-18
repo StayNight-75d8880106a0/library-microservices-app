@@ -60,7 +60,7 @@ func (kc *KeycloakClient) Login(ctx context.Context, username string, password s
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, helper.NewUnauthorizedError("Invalid credentials from keycloak!", helper.ErrorDetail{Detail: "Username or password is incorrect!"})
+		return nil, helper.NewUnauthorizedError("Username or password is incorrect!", helper.ErrorDetail{Detail: "Invalid credentials from keycloak!"})
 	}
 
 	var result map[string]interface{}
