@@ -3,6 +3,7 @@ package registry
 import (
 	"auth-services/internal/config"
 	"auth-services/internal/delivery/controller"
+	"auth-services/internal/infrastructure/kafka/producer"
 	"auth-services/internal/infrastructure/keycloak"
 	"auth-services/internal/repository"
 	"auth-services/internal/usecase"
@@ -21,7 +22,9 @@ func NewAuthModuleRegistry(appConfig *config.AppConfig, rds *redis.Client) *Auth
 
 	repository := repository.NewAuthRepositoryRegistry(rds)
 
-	usecase := usecase.NewAuthUsecaseRegistry(keyCloakClient, *repository)
+	kafkaProducer := producer.NewKafkaProducer(appConfig.Kafka.Brokers, appConfig.Kafka.Topic)
+
+	usecase := usecase.NewAuthUsecaseRegistry(keyCloakClient, *repository, kafkaProducer)
 
 	controller := controller.NewAuthControllerRegistry(usecase)
 

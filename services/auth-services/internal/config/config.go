@@ -53,10 +53,23 @@ func NewRedisConfig() *RedisConfig {
 	}
 }
 
+type KafkaConfig struct {
+	Brokers []string
+	Topic   string
+}
+
+func NewKafkaConfig() *KafkaConfig {
+	return &KafkaConfig{
+		Brokers: []string{os.Getenv("KAFKA_BROKERS")},
+		Topic:   os.Getenv("KAFKA_TOPIC_USER_CREATED"),
+	}
+}
+
 type AppConfig struct {
 	Port     *PortConfig
 	Keycloak *KeycloakConfig
 	Redis    *RedisConfig
+	Kafka    *KafkaConfig
 }
 
 func NewAppConfig() *AppConfig {
@@ -72,5 +85,6 @@ func NewAppConfig() *AppConfig {
 		Port:     NewPortConfig(),
 		Keycloak: NewKeycloakConfig(),
 		Redis:    NewRedisConfig(),
+		Kafka:    NewKafkaConfig(),
 	}
 }

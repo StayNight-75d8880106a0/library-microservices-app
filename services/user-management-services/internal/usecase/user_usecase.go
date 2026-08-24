@@ -5,21 +5,26 @@ import (
 	"user-management-services/internal/dto"
 	"user-management-services/internal/helper"
 	"user-management-services/internal/infrastructure/keycloak"
+	"user-management-services/internal/models"
+	"user-management-services/internal/repository"
 )
 
 type UserProfileUsecaseInterface interface {
 	UpdateMyProfile(ctx context.Context, userID string, request *dto.UserUpdateProfileRequest) error
 	UpdateMyPassword(ctx context.Context, userID string, request *dto.UserUpdatePasswordRequest) error
 	GetMyProfile(ctx context.Context, userID string) (*dto.UserResponse, error)
+	CreateUserFromEvent(ctx context.Context, payload *dto.UserCreatedKafkaPayloadConsumer) error
 }
 
 type UserProfileUsecase struct {
-	keycloak keycloak.KeycloakUserInterface
+	keycloak   keycloak.KeycloakUserInterface
+	repository repository.UserRepositoryInterface
 }
 
-func NewUserProfileUsecaseRegistry(keycloakCLient keycloak.KeycloakUserInterface) *UserProfileUsecase {
+func NewUserProfileUsecaseRegistry(keycloakCLient keycloak.KeycloakUserInterface, userRepository repository.UserRepositoryInterface) *UserProfileUsecase {
 	return &UserProfileUsecase{
-		keycloak: keycloakCLient,
+		keycloak:   keycloakCLient,
+		repository: userRepository,
 	}
 }
 
@@ -116,4 +121,24 @@ func (u *UserProfileUsecase) GetMyProfile(ctx context.Context, userID string) (*
 	}
 
 	return result, nil
+}
+
+func (u *UserProfileUsecase) CreateUserFromEvent(ctx context.Context, payload *dto.UserCreatedKafkaPayloadConsumer) error {
+
+	result := &models.Users{
+		KeycloakUserID:    payload.KeycloakID,
+		FirstName:         payload.FirstName,
+		LastName:          payload.LastName,
+		LibraryCardNumber: helper.GenerateLibraryCardNumber(),
+		ProfileStatus:     "INCOMPLETE",
+		CreatedAt:         payload.CreatedAt,
+	}
+
+	errCreate := u.repository.CreateUserFromEvent(ctx, result)
+
+	if errCreate != nil {
+		return helper.NewInternalServerError("Failed to Create User From Event!", helper.ErrorDetail{Detail: errCreate.Error()})
+	}
+
+	return nil
 }

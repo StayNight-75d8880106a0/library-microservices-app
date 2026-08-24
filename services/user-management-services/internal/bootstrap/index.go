@@ -1,9 +1,13 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"time"
 	"user-management-services/internal/config"
+	"user-management-services/internal/database"
 	"user-management-services/internal/delivery/router/initrouter"
 	"user-management-services/internal/registry/initregistry"
 
@@ -17,6 +21,12 @@ func InitApp() {
 
 	appConfig := config.NewAppConfig()
 
+	errConnectDatabase := database.Connect()
+
+	if errConnectDatabase != nil {
+		log.Fatalf("Failed to connect to Postgres: %v", errConnectDatabase)
+	}
+
 	jwksURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/certs", appConfig.Keycloak.KeycloakURL, appConfig.Keycloak.Realm)
 
 	jwks, err := keyfunc.NewDefault([]string{jwksURL})
@@ -27,9 +37,30 @@ func InitApp() {
 
 	app := gin.Default()
 
-	modules := initregistry.NewInitRegistry(appConfig)
+	modules := initregistry.NewInitRegistry(appConfig, database.DB)
 	initrouter.InitRouter(app, modules, jwks, appConfig)
 
-	app.Run(":" + appConfig.Port.PORT)
+	ctx, cancelConsumer := context.WithCancel(context.Background())
+	defer cancelConsumer()
+
+	modules.User.UserConsumer.StartConsuming(ctx)
+	defer modules.User.UserConsumer.Close()
+
+	srv := &http.Server{Addr: ":" + appConfig.Port.PORT, Handler: app}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Println("Shutting down...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	srv.Shutdown(shutdownCtx)
+	modules.User.UserConsumer.Close()
 
 }

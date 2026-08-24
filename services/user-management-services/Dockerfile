@@ -1,5 +1,6 @@
 FROM golang:1.25-alpine AS builder
 
+RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 RUN apk add --no-cache ca-certificates git tzdata
 
 WORKDIR /app 
@@ -19,10 +20,12 @@ FROM scratch
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 
 WORKDIR /app
 
 COPY --from=builder /app/main-app .
+COPY --from=builder /app/internal/database/migration ./app/database/migration
 
 EXPOSE 9190
 

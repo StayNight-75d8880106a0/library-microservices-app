@@ -42,7 +42,7 @@ func (u *AdminUsecase) GetAllUsers(ctx context.Context, page int, limit int) ([]
 		return []dto.AdminResponse{}, helper.PaginationMeta{}, helper.NewInternalServerError("Failed to Get Admin Token!", helper.ErrorDetail{Detail: errToken.Error()})
 	}
 
-	usersData, totalData, errGetUsers := u.keycloak.GetUsers(ctx, keycloakToken, offset, limit)
+	usersData, totalData, errGetUsers := u.keycloak.GetUsers(ctx, keycloakToken, offset, limit, "ADMIN")
 
 	if errGetUsers != nil {
 		return []dto.AdminResponse{}, helper.PaginationMeta{}, errGetUsers

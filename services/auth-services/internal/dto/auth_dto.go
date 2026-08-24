@@ -1,6 +1,7 @@
 package dto
 
 type RegisterUser struct {
+	NIK       *string `json:"nik" binding:"required"`
 	Username  *string `json:"username" binding:"required"`
 	Email     *string `json:"email" binding:"required"`
 	FirstName *string `json:"firstName" binding:"required"`

@@ -3,9 +3,12 @@ package usecase
 import (
 	"auth-services/internal/dto"
 	"auth-services/internal/helper"
+	"auth-services/internal/infrastructure/kafka/event"
+	"auth-services/internal/infrastructure/kafka/producer"
 	"auth-services/internal/infrastructure/keycloak"
 	"auth-services/internal/repository"
 	"context"
+	"log"
 	"time"
 )
 
@@ -18,14 +21,16 @@ type AuthUsecaseInterface interface {
 }
 
 type AuthUsecase struct {
-	keycloak   keycloak.KeycloakClientInterface
-	repository repository.AuthRepositoryInterface
+	keycloak      keycloak.KeycloakClientInterface
+	repository    repository.AuthRepositoryInterface
+	kafkaProducer *producer.KafkaProducer
 }
 
-func NewAuthUsecaseRegistry(keycloakClient keycloak.KeycloakClientInterface, authRepository repository.AuthRepository) *AuthUsecase {
+func NewAuthUsecaseRegistry(keycloakClient keycloak.KeycloakClientInterface, authRepository repository.AuthRepository, kafkaProducer *producer.KafkaProducer) *AuthUsecase {
 	return &AuthUsecase{
-		keycloak:   keycloakClient,
-		repository: &authRepository,
+		keycloak:      keycloakClient,
+		repository:    &authRepository,
+		kafkaProducer: kafkaProducer,
 	}
 }
 
@@ -59,6 +64,10 @@ func (u *AuthUsecase) Login(ctx context.Context, request *dto.LoginRequest) (*dt
 
 func (u *AuthUsecase) RegisterUser(ctx context.Context, request *dto.RegisterUser) error {
 
+	if request.NIK == nil || *request.NIK == "" {
+		return helper.NewUnprocessableEntityError("NIK Cannot Be Empty!", helper.ErrorDetail{Detail: "NIK is required!"})
+	}
+
 	if request.Username == nil || *request.Username == "" {
 		return helper.NewUnprocessableEntityError("Username Cannot Be Empty!", helper.ErrorDetail{Detail: "Username is required!"})
 	}
@@ -91,6 +100,9 @@ func (u *AuthUsecase) RegisterUser(ctx context.Context, request *dto.RegisterUse
 		"firstName": *request.FirstName,
 		"lastName":  *request.LastName,
 		"enabled":   true,
+		"attributes": map[string][]string{
+			"nik": {*request.NIK},
+		},
 		"credentials": []map[string]interface{}{
 			{
 				"type":      "password",
@@ -100,9 +112,27 @@ func (u *AuthUsecase) RegisterUser(ctx context.Context, request *dto.RegisterUse
 		},
 	}
 
-	result := u.keycloak.RegisterUser(ctx, adminToken, payload)
+	keycloakUserID, errCreate := u.keycloak.RegisterUser(ctx, adminToken, payload)
 
-	return result
+	if errCreate != nil {
+		return errCreate
+	}
+
+	event := &event.UserCreatedEvent{
+		KeycloakID: keycloakUserID,
+		FirstName:  *request.FirstName,
+		LastName:   *request.LastName,
+		CreatedAt:  time.Now(),
+	}
+
+	go func() {
+		errPublish := u.kafkaProducer.PublishUserCreatedEvent(context.Background(), event, keycloakUserID)
+		if errPublish != nil {
+			log.Printf("[Kafka Publish Error] Failed to send event for user %s: %v", keycloakUserID, errPublish)
+		}
+	}()
+
+	return nil
 
 }
 

@@ -17,7 +17,7 @@ import (
 type KeycloakClientInterface interface {
 	Login(ctx context.Context, username string, password string) (map[string]interface{}, error)
 	GetAdminToken(ctx context.Context) (string, error)
-	RegisterUser(ctx context.Context, adminToken string, payload map[string]interface{}) error
+	RegisterUser(ctx context.Context, adminToken string, payload map[string]interface{}) (string, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*dto.LoginResponse, error)
 	Logout(ctx context.Context, refreshToken string) error
 }
@@ -103,14 +103,14 @@ func (kc *KeycloakClient) GetAdminToken(ctx context.Context) (string, error) {
 
 }
 
-func (kc *KeycloakClient) RegisterUser(ctx context.Context, adminToken string, payload map[string]interface{}) error {
+func (kc *KeycloakClient) RegisterUser(ctx context.Context, adminToken string, payload map[string]interface{}) (string, error) {
 
 	endpoint := fmt.Sprintf("%s/admin/realms/%s/users", kc.cfg.KeycloakURL, kc.cfg.Realm)
 
 	jsonData, errJson := json.Marshal(payload)
 
 	if errJson != nil {
-		return helper.NewInternalServerError("Failed to marshal payload for user registration!", helper.ErrorDetail{Detail: errJson.Error()})
+		return "", helper.NewInternalServerError("Failed to marshal payload for user registration!", helper.ErrorDetail{Detail: errJson.Error()})
 	}
 
 	request, errRequets := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(jsonData))
@@ -118,7 +118,7 @@ func (kc *KeycloakClient) RegisterUser(ctx context.Context, adminToken string, p
 	request.Header.Set("Content-Type", "application/json")
 
 	if errRequets != nil {
-		return helper.NewInternalServerError("Failed to create user registration request to keycloak!", helper.ErrorDetail{Detail: errRequets.Error()})
+		return "", helper.NewInternalServerError("Failed to create user registration request to keycloak!", helper.ErrorDetail{Detail: errRequets.Error()})
 	}
 
 	httpClient := &http.Client{}
@@ -126,17 +126,26 @@ func (kc *KeycloakClient) RegisterUser(ctx context.Context, adminToken string, p
 	response, errResponse := httpClient.Do(request)
 
 	if errResponse != nil {
-		return helper.NewInternalServerError("Failed to send user registration request to keycloak!", helper.ErrorDetail{Detail: errResponse.Error()})
+		return "", helper.NewInternalServerError("Failed to send user registration request to keycloak!", helper.ErrorDetail{Detail: errResponse.Error()})
 	}
 
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusCreated {
 		bodyBytes, _ := io.ReadAll(response.Body)
-		return helper.NewInternalServerError("Failed to register user in keycloak!", helper.ErrorDetail{Detail: string(bodyBytes)})
+		return "", helper.NewInternalServerError("Failed to register user in keycloak!", helper.ErrorDetail{Detail: string(bodyBytes)})
 	}
 
-	return nil
+	locationHeader := response.Header.Get("Location")
+
+	if locationHeader == "" {
+		return "", helper.NewInternalServerError("Failed to get user ID from keycloak response!", helper.ErrorDetail{Detail: "Location header is missing in the response!"})
+	}
+
+	parts := strings.Split(locationHeader, "/")
+	keycloakUserID := parts[len(parts)-1]
+
+	return keycloakUserID, nil
 }
 
 func (kc *KeycloakClient) RefreshToken(ctx context.Context, refreshToken string) (*dto.LoginResponse, error) {

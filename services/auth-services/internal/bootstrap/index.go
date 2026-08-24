@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/gin-gonic/gin"
@@ -38,6 +40,22 @@ func InitApp() {
 	modules := initregistry.NewInitRegistry(appConfig, redisdb.RDS)
 	initrouter.InitRouter(app, modules, jwks, appConfig)
 
-	app.Run(":" + appConfig.Port.PORT)
+	ctx, cancelConsumer := context.WithCancel(context.Background())
+	defer cancelConsumer()
 
+	srv := &http.Server{Addr: ":" + appConfig.Port.PORT, Handler: app}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Println("Shutting down...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	srv.Shutdown(shutdownCtx)
 }

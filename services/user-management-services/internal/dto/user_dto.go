@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 type UserUpdatePasswordRequest struct {
 	NewPassword     *string `json:"newPassword"`
 	ConfirmPassword *string `json:"confirmPassword"`
@@ -36,4 +38,11 @@ type UserResponse struct {
 	Email         *string `json:"email"`
 	EmailVerified *bool   `json:"emailVerified"`
 	CreatedAt     string  `json:"createdAt"`
+}
+
+type UserCreatedKafkaPayloadConsumer struct {
+	KeycloakID string    `json:"keycloakId"`
+	FirstName  string    `json:"firstName"`
+	LastName   string    `json:"lastName"`
+	CreatedAt  time.Time `json:"createdAt"`
 }

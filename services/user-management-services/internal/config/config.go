@@ -35,9 +35,47 @@ func NewKeycloakConfig() *KeycloakConfig {
 	}
 }
 
+type DatabaseConfig struct {
+	Host     string
+	Port     string
+	User     string
+	Passwrod string
+	Name     string
+	SSLMode  string
+	Timezone string
+}
+
+func NewDatabaseConfig() *DatabaseConfig {
+	return &DatabaseConfig{
+		Host:     os.Getenv("userManagement_DB_HOST"),
+		Port:     os.Getenv("DB_PORT_GLOBAL"),
+		User:     os.Getenv("userManagement_DB_USER"),
+		Passwrod: os.Getenv("userManagement_DB_PASSWORD"),
+		Name:     os.Getenv("userManagement_DB_NAME"),
+		SSLMode:  os.Getenv("DB_SSLMODE"),
+		Timezone: os.Getenv("DB_TIMEZONE"),
+	}
+}
+
+type KafkaConfig struct {
+	Brokers []string
+	Topic   string
+	GroupID string
+}
+
+func NewKafkaConfig() *KafkaConfig {
+	return &KafkaConfig{
+		Brokers: []string{os.Getenv("KAFKA_BROKERS")},
+		Topic:   os.Getenv("KAFKA_TOPIC_USER_CREATED"),
+		GroupID: os.Getenv("KAFKA_CONSUMER_GROUP_USER_MANAGEMENT"),
+	}
+}
+
 type AppConfig struct {
 	Port     *PortConfig
 	Keycloak *KeycloakConfig
+	DB       *DatabaseConfig
+	Kafka    *KafkaConfig
 }
 
 func NewAppConfig() *AppConfig {
@@ -52,5 +90,7 @@ func NewAppConfig() *AppConfig {
 	return &AppConfig{
 		Port:     NewPortConfig(),
 		Keycloak: NewKeycloakConfig(),
+		DB:       NewDatabaseConfig(),
+		Kafka:    NewKafkaConfig(),
 	}
 }

@@ -152,13 +152,36 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+      user-management-db:
+        condition: service_healthy
     networks:
       - app_network
+
+  user-management-db:
+    image: postgres:15
+    container_name: user-management-db
+    environment:
+      POSTGRES_DB: ${userManagement_DB_NAME}
+      POSTGRES_USER: ${userManagement_DB_USER}
+      POSTGRES_PASSWORD: ${userManagement_DB_PASSWORD}
+    ports:
+      - "${userManagement_DB_PORT_EXPOSE}:${DB_PORT_GLOBAL}"
+    volumes:
+      - db_data_user_management:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${userManagement_DB_USER} -d ${userManagement_DB_NAME}"]
+      interval: 11s
+      timeout: 6s
+      retries: 7
 
 volumes:
   keycloak_data:
     driver: local
   kafka_data:
+    driver: local
+  db_data_user_management:
     driver: local
   
 networks:

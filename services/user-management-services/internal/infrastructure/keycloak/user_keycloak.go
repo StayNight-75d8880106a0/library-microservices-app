@@ -21,8 +21,8 @@ type KeycloakUserInterface interface {
 	GetUserRoles(ctx context.Context, token string, userID string) ([]string, error)
 	// UpdateUserProfile(ctx context.Context, token string, userID string, payload map[string]interface{}) error
 	DeleteUser(ctx context.Context, token string, userID string) error
-	GetUsers(ctx context.Context, token string, first int, max int) ([]map[string]interface{}, int64, error)
-	countUsers(ctx context.Context, token string) (int64, error)
+	GetUsers(ctx context.Context, token string, first int, max int, roleName string) ([]map[string]interface{}, int64, error)
+	countUsers(ctx context.Context, token string, roleName string) (int64, error)
 	GetMyProfile(ctx context.Context, token string, userID string) (map[string]interface{}, error)
 }
 
@@ -357,9 +357,9 @@ func (kc *KeycloakClientUser) DeleteUser(ctx context.Context, token string, user
 
 }
 
-func (kc *KeycloakClientUser) GetUsers(ctx context.Context, token string, first int, max int) ([]map[string]interface{}, int64, error) {
+func (kc *KeycloakClientUser) GetUsers(ctx context.Context, token string, first int, max int, roleName string) ([]map[string]interface{}, int64, error) {
 
-	total, errCount := kc.countUsers(ctx, token)
+	total, errCount := kc.countUsers(ctx, token, roleName)
 
 	if errCount != nil {
 		return nil, 0, helper.NewInternalServerError("An Error During Count Users!", helper.ErrorDetail{Detail: errCount.Error()})
@@ -369,7 +369,7 @@ func (kc *KeycloakClientUser) GetUsers(ctx context.Context, token string, first 
 		return []map[string]interface{}{}, 0, nil
 	}
 
-	endpoint := fmt.Sprintf("%s/admin/realms/%s/users?first=%d&max=%d", kc.cfg.KeycloakURL, kc.cfg.Realm, first, max)
+	endpoint := fmt.Sprintf("%s/admin/realms/%s/roles/%s/users?first=%d&max=%d", kc.cfg.KeycloakURL, kc.cfg.Realm, roleName, first, max)
 
 	request, errRequest := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 
@@ -400,36 +400,32 @@ func (kc *KeycloakClientUser) GetUsers(ctx context.Context, token string, first 
 
 }
 
-func (kc *KeycloakClientUser) countUsers(ctx context.Context, token string) (int64, error) {
+func (kc *KeycloakClientUser) countUsers(ctx context.Context, token string, roleName string) (int64, error) {
 
-	endpoint := fmt.Sprintf("%s/admin/realms/%s/users/count", kc.cfg.KeycloakURL, kc.cfg.Realm)
+	endpoint := fmt.Sprintf("%s/admin/realms/%s/roles/%s/users", kc.cfg.KeycloakURL, kc.cfg.Realm, roleName)
 
-	request, errRequest := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
-
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return 0, err
+	}
 	request.Header.Set("Authorization", "Bearer "+token)
 
-	if errRequest != nil {
-		return 0, helper.NewInternalServerError("An Error During Create Request!", helper.ErrorDetail{Detail: errRequest.Error()})
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return 0, err
 	}
-
-	response, errResponse := http.DefaultClient.Do(request)
-
-	if errResponse != nil {
-		return 0, helper.NewInternalServerError("An Error During Request!", helper.ErrorDetail{Detail: errResponse.Error()})
-	}
-
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return 0, helper.NewInternalServerError("An Error During Count Users!", helper.ErrorDetail{Detail: fmt.Sprintf("Response Status Code: %d", response.StatusCode)})
+		return 0, fmt.Errorf("failed to count users, status: %d", response.StatusCode)
 	}
 
-	var count int64
-	if err := json.NewDecoder(response.Body).Decode(&count); err != nil {
+	var allUsers []map[string]interface{}
+	if err := json.NewDecoder(response.Body).Decode(&allUsers); err != nil {
 		return 0, err
 	}
 
-	return count, nil
+	return int64(len(allUsers)), nil
 
 }
 
