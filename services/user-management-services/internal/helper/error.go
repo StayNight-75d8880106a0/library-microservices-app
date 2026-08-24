@@ -79,3 +79,12 @@ func NewForbiddenError(message string, details ErrorDetail) *AppError {
 		Detail:       details,
 	}
 }
+
+func NewNotFoundError(message string, details ErrorDetail) *AppError {
+	return &AppError{
+		Code:         http.StatusNotFound,
+		ErrorCode:    "NOT_FOUND",
+		ErrorMessage: message,
+		Detail:       details,
+	}
+}

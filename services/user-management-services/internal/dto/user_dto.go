@@ -8,8 +8,10 @@ type UserUpdatePasswordRequest struct {
 }
 
 type UserUpdateProfileRequest struct {
-	FirstName *string `json:"firstName"`
-	LastName  *string `json:"lastName"`
+	FirstName   *string `json:"firstName"`
+	LastName    *string `json:"lastName"`
+	PhoneNumber *string `json:"phoneNumber"`
+	Address     *string `json:"address"`
 }
 
 type CreateAdminRequest struct {
@@ -31,13 +33,18 @@ type AdminResponse struct {
 }
 
 type UserResponse struct {
-	ID            *string `json:"id"`
-	Username      *string `json:"username"`
-	FirstName     *string `json:"firstName"`
-	LastName      *string `json:"lastName"`
-	Email         *string `json:"email"`
-	EmailVerified *bool   `json:"emailVerified"`
-	CreatedAt     string  `json:"createdAt"`
+	ID                *string `json:"id"`
+	Username          *string `json:"username"`
+	FirstName         *string `json:"firstName"`
+	LastName          *string `json:"lastName"`
+	Email             *string `json:"email"`
+	EmailVerified     *bool   `json:"emailVerified"`
+	PhoneNumber       *string `json:"phoneNumber"`
+	Address           *string `json:"address"`
+	ProfileStatus     string  `json:"profileStatus"`
+	LibraryCardNumber *string `json:"libraryCardNumber"`
+	CreatedAt         string  `json:"createdAt"`
+	UpdatedAt         string  `json:"updatedAt"`
 }
 
 type UserCreatedKafkaPayloadConsumer struct {

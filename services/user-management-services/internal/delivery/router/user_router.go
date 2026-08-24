@@ -11,7 +11,7 @@ import (
 
 func UserRouter(app *gin.Engine, UserController *controller.UserController, jwks keyfunc.Keyfunc, cfg *config.AppConfig) {
 
-	user := app.Group("/api/v1/user-management/my", middleware.AuthMiddleware(jwks, cfg), middleware.RequireRole("USER"))
+	user := app.Group("/api/v1/user-management/my", middleware.AuthMiddleware(jwks, cfg), middleware.RequireRole("USER_PUBLIC"))
 
 	user.PUT("/password", UserController.UpdateMyPassword)
 	user.PUT("/profile", UserController.UpdateMyProfile)

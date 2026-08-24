@@ -2,11 +2,14 @@ package usecase
 
 import (
 	"context"
+	"time"
 	"user-management-services/internal/dto"
 	"user-management-services/internal/helper"
 	"user-management-services/internal/infrastructure/keycloak"
 	"user-management-services/internal/models"
 	"user-management-services/internal/repository"
+
+	"gorm.io/gorm"
 )
 
 type UserProfileUsecaseInterface interface {
@@ -38,6 +41,29 @@ func (u *UserProfileUsecase) UpdateMyProfile(ctx context.Context, userID string,
 		return helper.NewUnprocessableEntityError("Last Name Cannot Be Empty!", helper.ErrorDetail{Detail: "Last Name Is Required!"})
 	}
 
+	if request.PhoneNumber == nil || *request.PhoneNumber == "" {
+		return helper.NewUnprocessableEntityError("Phone Number Cannot Be Empty!", helper.ErrorDetail{Detail: "Phone Number Is Required!"})
+	}
+
+	if request.Address == nil || *request.Address == "" {
+		return helper.NewUnprocessableEntityError("Address Cannot Be Empty!", helper.ErrorDetail{Detail: "Address Is Required!"})
+	}
+
+	errValidatePhone := helper.ValidateIndonesianPhoneNumber(*request.PhoneNumber)
+
+	if errValidatePhone != nil {
+		return helper.NewUnprocessableEntityError("Invalid Phone Number!", helper.ErrorDetail{Detail: errValidatePhone.Error()})
+	}
+
+	userDB, errGetUser := u.repository.GetUserByKeycloakID(ctx, userID)
+
+	if errGetUser != nil {
+		if errGetUser == gorm.ErrRecordNotFound {
+			return helper.NewNotFoundError("User Not Found!", helper.ErrorDetail{Detail: "User With ID " + userID + " Not Found!"})
+		}
+		return helper.NewInternalServerError("Failed to Get User!", helper.ErrorDetail{Detail: errGetUser.Error()})
+	}
+
 	keycloakToken, errToken := u.keycloak.GetAdminToken(ctx)
 
 	if errToken != nil {
@@ -49,10 +75,26 @@ func (u *UserProfileUsecase) UpdateMyProfile(ctx context.Context, userID string,
 		"lastName":  *request.LastName,
 	}
 
-	errUpdateProfile := u.keycloak.UpdateProfile(ctx, keycloakToken, userID, payload)
+	errUpdateProfileKeycloak := u.keycloak.UpdateProfile(ctx, keycloakToken, userID, payload)
 
-	if errUpdateProfile != nil {
-		return errUpdateProfile
+	if errUpdateProfileKeycloak != nil {
+		return errUpdateProfileKeycloak
+	}
+
+	userDB.FirstName = *request.FirstName
+	userDB.LastName = *request.LastName
+	userDB.PhoneNumber = *request.PhoneNumber
+	userDB.Address = *request.Address
+	userDB.UpdatedAt = time.Now()
+
+	if userDB.ProfileStatus == models.UserStatusIncomplete {
+		userDB.ProfileStatus = models.UserStatusActive
+	}
+
+	errUpdateProfileDB := u.repository.UpdateUserProfileDB(ctx, userDB, userID)
+
+	if errUpdateProfileDB != nil {
+		return helper.NewInternalServerError("Failed to Update User Profile!", helper.ErrorDetail{Detail: errUpdateProfileDB.Error()})
 	}
 
 	return nil
@@ -102,6 +144,15 @@ func (u *UserProfileUsecase) GetMyProfile(ctx context.Context, userID string) (*
 		return nil, errGetProfile
 	}
 
+	profileDB, errGetProfileDB := u.repository.GetUserByKeycloakID(ctx, userID)
+
+	if errGetProfileDB != nil {
+		if errGetProfileDB == gorm.ErrRecordNotFound {
+			return nil, helper.NewNotFoundError("User Not Found!", helper.ErrorDetail{Detail: "User With ID " + userID + " Not Found!"})
+		}
+		return nil, helper.NewInternalServerError("Failed to Get User!", helper.ErrorDetail{Detail: errGetProfileDB.Error()})
+	}
+
 	id, _ := profile["id"].(string)
 	username, _ := profile["username"].(string)
 	firstName, _ := profile["firstName"].(string)
@@ -118,6 +169,14 @@ func (u *UserProfileUsecase) GetMyProfile(ctx context.Context, userID string) (*
 		Email:         &email,
 		EmailVerified: &emailVerified,
 		CreatedAt:     helper.FormatEpochMillisRFC3339Jakarta(int64(createdAt)),
+	}
+
+	if profileDB != nil {
+		result.PhoneNumber = &profileDB.PhoneNumber
+		result.LibraryCardNumber = &profileDB.LibraryCardNumber
+		result.Address = &profileDB.Address
+		result.ProfileStatus = string(profileDB.ProfileStatus)
+		result.UpdatedAt = helper.FormatEpochMillisRFC3339Jakarta(profileDB.UpdatedAt.UnixNano() / int64(time.Millisecond))
 	}
 
 	return result, nil
