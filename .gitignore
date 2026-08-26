@@ -49,6 +49,8 @@ Thumbs.db
 *.wmv
 
 .env
+.env.shared
+.env.docker
 
 README-PRIBADI.md
 MIGRATION.md

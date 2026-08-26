@@ -127,7 +127,8 @@ services:
     ports:
       - ${AUTH_APP_PORT}:${AUTH_APP_PORT}
     env_file:
-      - .env
+      - .env.shared
+      - ./services/auth-services/.env.docker
     depends_on:
       redis:
         condition: service_healthy
@@ -146,7 +147,8 @@ services:
     ports:
       - ${USER_MANAGEMENT_PORT}:${USER_MANAGEMENT_PORT}
     env_file:
-      - .env
+      - .env.shared
+      - ./services/user-management-services/.env.docker
     depends_on:
       redis:
         condition: service_healthy
@@ -160,6 +162,7 @@ services:
   user-management-db:
     image: postgres:15
     container_name: user-management-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${userManagement_DB_NAME}
       POSTGRES_USER: ${userManagement_DB_USER}
@@ -176,6 +179,53 @@ services:
       timeout: 6s
       retries: 7
 
+  book-management-db:
+    image: mysql:9.5.0
+    container_name: book-management-db
+    restart: unless-stopped
+    ports:
+      - "${bookManagement_MYSQL_PORT_EXPOSE}:${MYSQL_PORT_GLOBAL}"
+    environment:
+      MYSQL_USER: ${bookManagement_MYSQL_USER}
+      MYSQL_ROOT_PASSWORD: ${bookManagement_MYSQL_ROOT_PASSWORD}
+      MYSQL_PASSWORD: ${bookManagement_MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${bookManagement_MYSQL_DATABASE}
+      MYSQL_CHARSET: ${bookManagement_MYSQL_CHARSET}
+      MYSQL_COLLATION: ${bookManagement_MYSQL_COLLATION}
+    volumes:
+      - book_management_data:/var/lib/mysql
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${bookManagement_MYSQL_ROOT_PASSWORD}"]
+      interval: 11s
+      timeout: 5s
+      retries: 5
+      start_period: 31s
+
+  book-management_service:
+    build: 
+      context: ./services/book-management-services
+      dockerfile: Dockerfile
+    image: book-management-service:latest
+    container_name: book-management-service
+    restart: unless-stopped
+    ports:
+      - ${BOOK_MANAGEMENT_PORT}:${BOOK_MANAGEMENT_PORT}
+    env_file:
+      - .env.shared
+      - ./services/book-management-services/.env.docker
+    depends_on:
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      book-management-db:
+        condition: service_healthy
+    networks:
+      - app_network
+
+
 volumes:
   keycloak_data:
     driver: local
@@ -183,7 +233,9 @@ volumes:
     driver: local
   db_data_user_management:
     driver: local
-  
+  book_management_data:
+    driver: local
+
 networks:
   app_network:
     driver: bridge
