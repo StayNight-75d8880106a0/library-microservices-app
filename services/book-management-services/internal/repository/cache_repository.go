@@ -12,14 +12,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type BookCacheRepositoryInterface interface {
-	Create(ctx context.Context, book *models.Books) error
-	GetById(ctx context.Context, ID string) (*models.Books, error)
-	GetAll(ctx context.Context, param dto.GetBooksQuery) ([]models.Books, int64, error)
-	Delete(ctx context.Context, ID string) error
-	Update(ctx context.Context, book *models.Books, ID string) error
-}
-
 type BookCacheRepository struct {
 	base BookRepositoryInterface
 	rds  *redis.Client
@@ -51,6 +43,8 @@ func (repo *BookCacheRepository) GetById(ctx context.Context, ID string) (*model
 
 		if errJson != nil {
 			return nil, errJson
+		} else {
+			return &book, nil
 		}
 	}
 
