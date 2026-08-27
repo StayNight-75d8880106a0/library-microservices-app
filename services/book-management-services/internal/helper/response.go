@@ -14,6 +14,7 @@ type PaginationMeta struct {
 	Page      int     `json:"page"`
 	Limit     int     `json:"limit"`
 	Keywords  *string `json:"keywords"`
+	Category  *string `json:"category"`
 }
 
 type ResponseGlobal struct {

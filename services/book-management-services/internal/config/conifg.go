@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -45,22 +46,72 @@ type RedisConfig struct {
 	RedisPort     string
 	RedisPassword string
 	RedisDB       int
+	RedisCacheTTL time.Duration
 }
 
 func NewRedisConfig() *RedisConfig {
 	redisDB, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
+
+	detail, errDetail := time.ParseDuration(os.Getenv("REDIS_CACHE_TTL"))
+
+	if errDetail != nil {
+		detail = 11 * time.Minute
+	}
+
 	return &RedisConfig{
 		RedisHost:     os.Getenv("REDIS_HOST"),
 		RedisPort:     os.Getenv("REDIS_PORT"),
 		RedisPassword: os.Getenv("REDIS_PASSWORD"),
+		RedisCacheTTL: detail,
 		RedisDB:       redisDB,
 	}
 }
 
+type KeycloakConfig struct {
+	KeycloakURL    string
+	KeycloakRealm  string
+	KeycloakIssuer string
+	ClientID       string
+	Realm          string
+}
+
+func NewKeycloakConfig() *KeycloakConfig {
+	return &KeycloakConfig{
+		KeycloakURL:    os.Getenv("KEYCLOAK_URL"),
+		KeycloakRealm:  os.Getenv("KEYCLOAK_REALM"),
+		KeycloakIssuer: os.Getenv("KEYCLOAK_ISSUER"),
+		ClientID:       os.Getenv("KEYCLOAK_CLIENT_ID"),
+		Realm:          os.Getenv("KEYCLOAK_REALM"),
+	}
+}
+
+type ElasticsearchConfig struct {
+	ElasticsearchURL string
+}
+
+func NewElasticsearchConfig() *ElasticsearchConfig {
+	return &ElasticsearchConfig{
+		ElasticsearchURL: os.Getenv("ELASTICSEARCH_URL"),
+	}
+}
+
+type OpenLibraryAPIConfig struct {
+	OpenLibraryAPIURL string
+}
+
+func NewOpenLibraryAPIConfig() *OpenLibraryAPIConfig {
+	return &OpenLibraryAPIConfig{
+		OpenLibraryAPIURL: os.Getenv("OPEN_LIBRARY_API_URL"),
+	}
+}
+
 type AppConfig struct {
-	PortConfig  *PortConfig
-	MySQLConfig *MySQLConfig
-	RedisConfig *RedisConfig
+	PortConfig     *PortConfig
+	MySQLConfig    *MySQLConfig
+	RedisConfig    *RedisConfig
+	Keycloak       *KeycloakConfig
+	Elasticsearch  *ElasticsearchConfig
+	OpenLibraryAPI *OpenLibraryAPIConfig
 }
 
 func NewAppConfig() *AppConfig {
@@ -73,8 +124,11 @@ func NewAppConfig() *AppConfig {
 	}
 
 	return &AppConfig{
-		PortConfig:  NewPortConfig(),
-		MySQLConfig: NewMySQLConfig(),
-		RedisConfig: NewRedisConfig(),
+		PortConfig:     NewPortConfig(),
+		MySQLConfig:    NewMySQLConfig(),
+		RedisConfig:    NewRedisConfig(),
+		Keycloak:       NewKeycloakConfig(),
+		Elasticsearch:  NewElasticsearchConfig(),
+		OpenLibraryAPI: NewOpenLibraryAPIConfig(),
 	}
 }

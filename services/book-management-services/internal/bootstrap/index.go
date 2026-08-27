@@ -2,13 +2,18 @@ package bootstrap
 
 import (
 	"book-management-services/internal/config"
+	"book-management-services/internal/delivery/router/initrouter"
 	mysql "book-management-services/internal/infrastructure/database"
+	"book-management-services/internal/infrastructure/elasticsearch"
 	redisdb "book-management-services/internal/infrastructure/redis"
+	"book-management-services/internal/registry/initialregistry"
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,7 +37,24 @@ func InitApp() {
 		log.Fatalf("Failed to connect to Redis: %v", errConnectRedis)
 	}
 
+	errConnectElasticsearch := elasticsearch.InitElasticsearch(appConfig.Elasticsearch.ElasticsearchURL)
+
+	if errConnectElasticsearch != nil {
+		log.Fatalf("Failed to connect to Elasticsearch: %v", errConnectElasticsearch)
+	}
+
+	jwksURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/certs", appConfig.Keycloak.KeycloakURL, appConfig.Keycloak.Realm)
+
+	jwks, err := keyfunc.NewDefault([]string{jwksURL})
+
+	if err != nil {
+		log.Fatalf("Failed to fetch JWKS from Keycloak: %v", err)
+	}
+
 	app := gin.Default()
+
+	modules := initialregistry.NewInitRegistry(mysql.DB, redisdb.RDS, elasticsearch.ElasticseearchClient, appConfig)
+	initrouter.InitRouter(app, modules, jwks, appConfig)
 
 	srv := &http.Server{Addr: ":" + appConfig.PortConfig.PORT, Handler: app}
 

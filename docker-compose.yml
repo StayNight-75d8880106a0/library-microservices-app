@@ -116,6 +116,26 @@ services:
       interval: 11s
       timeout: 6s
       retries: 7
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "${ELASTICSEARCH_PORT_EXPOSE}:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=30s"]
+      interval: 31s
+      timeout: 11s
+      retries: 5
+      start_period: 61s
   
   auth-service:
     build: 
@@ -203,7 +223,7 @@ services:
       retries: 5
       start_period: 31s
 
-  book-management_service:
+  book-management-service:
     build: 
       context: ./services/book-management-services
       dockerfile: Dockerfile
@@ -222,6 +242,8 @@ services:
         condition: service_healthy
       book-management-db:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     networks:
       - app_network
 
@@ -234,6 +256,8 @@ volumes:
   db_data_user_management:
     driver: local
   book_management_data:
+    driver: local
+  es_data:
     driver: local
 
 networks:

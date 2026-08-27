@@ -17,7 +17,7 @@ type PaginationMeta struct {
 }
 
 type ResponseGlobal struct {
-	ReponseCode     int         `json:"responseCode"`
+	ResponseCode    int         `json:"responseCode"`
 	ResponseMessage string      `json:"responseMessage"`
 	Data            interface{} `json:"data"`
 	Error           interface{} `json:"error"`
@@ -26,7 +26,7 @@ type ResponseGlobal struct {
 
 func NewResponseGlobal(ctx *gin.Context, responseCode int, responseMessage string, data interface{}, err interface{}, pagination interface{}) {
 	ctx.JSON(responseCode, ResponseGlobal{
-		ReponseCode:     responseCode,
+		ResponseCode:    responseCode,
 		ResponseMessage: responseMessage,
 		Data:            data,
 		Error:           err,
