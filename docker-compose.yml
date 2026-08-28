@@ -105,9 +105,9 @@ services:
     networks:
       - app_network
     
-  redis:
+  redis-cache:
     image: redis:8.6.4
-    container_name: library-app-redis
+    container_name: library-app-redis-cache
     restart: unless-stopped
     ports:
       - "${REDIS_PORT_EXPOSE}:${REDIS_PORT}"
@@ -120,6 +120,27 @@ services:
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 11s
+      timeout: 6s
+      retries: 7
+
+  redis-persistence:
+    image: redis:8.6.4
+    container_name: library-app-redis-persistence
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PERSISTENCE_PORT_EXPOSE}:${REDIS_PORT}"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PERSISTENCE_PASSWORD}
+      REDIS_DATABASES: ${REDIS_DB_PERSISTENCE}
+      REDIS_HOST: ${REDIS_PERSISTENCE_HOST}
+    networks:
+      - app_network
+    command: [ "redis-server", "--requirepass", "${REDIS_PERSISTENCE_PASSWORD}", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redis_data_persistence:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PERSISTENCE_PASSWORD}", "ping"]
       interval: 11s
       timeout: 6s
       retries: 7
@@ -157,7 +178,7 @@ services:
       - .env.shared
       - ./services/auth-services/.env.docker
     depends_on:
-      redis:
+      redis-cache:
         condition: service_healthy
       keycloak:
         condition: service_healthy
@@ -177,7 +198,7 @@ services:
       - .env.shared
       - ./services/user-management-services/.env.docker
     depends_on:
-      redis:
+      redis-cache:
         condition: service_healthy
       keycloak:
         condition: service_healthy
@@ -243,7 +264,7 @@ services:
       - .env.shared
       - ./services/book-management-services/.env.docker
     depends_on:
-      redis:
+      redis-cache:
         condition: service_healthy
       keycloak:
         condition: service_healthy
@@ -254,6 +275,53 @@ services:
     networks:
       - app_network
 
+  borrowing-management-db:
+    image: mysql:9.5.0
+    container_name: borrowing-management-db
+    restart: unless-stopped
+    ports:
+      - "${borrowingManagement_MYSQL_PORT_EXPOSE}:${MYSQL_PORT_GLOBAL}"
+    environment:
+      MYSQL_USER: ${borrowingManagement_MYSQL_USER}
+      MYSQL_ROOT_PASSWORD: ${borrowingManagement_MYSQL_ROOT_PASSWORD}
+      MYSQL_PASSWORD: ${borrowingManagement_MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${borrowingManagement_MYSQL_DATABASE}
+      MYSQL_CHARSET: ${borrowingManagement_MYSQL_CHARSET}
+      MYSQL_COLLATION: ${borrowingManagement_MYSQL_COLLATION}
+    volumes:
+      - borrowing_management_data:/var/lib/mysql
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${borrowingManagement_MYSQL_ROOT_PASSWORD}"]
+      interval: 11s
+      timeout: 5s
+      retries: 5
+      start_period: 31s
+
+  borrowing-management-service:
+    build: 
+      context: ./services/borrowing-management-services
+      dockerfile: Dockerfile
+    image: borrowing-management-service:latest
+    container_name: borrowing-management-service
+    restart: unless-stopped
+    ports:
+      - ${BORROWING_MANAGEMENT_PORT}:${BORROWING_MANAGEMENT_PORT}
+    env_file:
+      - .env.shared
+      - ./services/borrowing-management-services/.env.docker
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+      redis-persistence:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      borrowing-management-db:
+        condition: service_healthy
+    networks:
+      - app_network
 
 volumes:
   keycloak_data:
@@ -265,6 +333,10 @@ volumes:
   book_management_data:
     driver: local
   es_data:
+    driver: local
+  redis_data_persistence:
+    driver: local
+  borrowing_management_data:
     driver: local
 
 networks:
