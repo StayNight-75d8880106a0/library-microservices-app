@@ -11,11 +11,13 @@ import (
 
 type PortConfig struct {
 	PORT string
+	GRPC string
 }
 
 func NewPortConfig() *PortConfig {
 	return &PortConfig{
 		PORT: os.Getenv("BORROWING_MANAGEMENT_PORT"),
+		GRPC: os.Getenv("USER_MANAGEMENT_GRPC_PORT"),
 	}
 }
 
@@ -103,12 +105,29 @@ func NewKeycloakConfig() *KeycloakConfig {
 	}
 }
 
+type KafkaConfig struct {
+	Brokers                []string
+	GroupID                string
+	TopicUserAuthenticated string
+	TopicUserStatusUpdated string
+}
+
+func NewKafkaConfig() *KafkaConfig {
+	return &KafkaConfig{
+		Brokers:                []string{os.Getenv("KAFKA_BROKERS")},
+		GroupID:                os.Getenv("BORROWING_MANAGEMENT_GROUP_ID"),
+		TopicUserAuthenticated: os.Getenv("KAFKA_TOPIC_USER_LOGIN"),
+		TopicUserStatusUpdated: os.Getenv("KAFKA_TOPIC_USER_UPDATED"),
+	}
+}
+
 type AppConfig struct {
 	PortConfig             *PortConfig
 	MySQLConfig            *MySQLConfig
 	RedisCacheConfig       *RedisCacheConfig
 	RedisPersistenceConfig *RedisPersistenceConfig
 	Keycloak               *KeycloakConfig
+	Kafka                  *KafkaConfig
 }
 
 func NewAppConfig() *AppConfig {
@@ -126,5 +145,6 @@ func NewAppConfig() *AppConfig {
 		RedisCacheConfig:       NewRedisCacheConfig(),
 		RedisPersistenceConfig: NewRedisPersistenceConfig(),
 		Keycloak:               NewKeycloakConfig(),
+		Kafka:                  NewKafkaConfig(),
 	}
 }

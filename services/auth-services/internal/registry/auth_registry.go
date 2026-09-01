@@ -22,9 +22,9 @@ func NewAuthModuleRegistry(appConfig *config.AppConfig, rds *redis.Client) *Auth
 
 	repository := repository.NewAuthRepositoryRegistry(rds)
 
-	kafkaProducer := producer.NewKafkaProducer(appConfig.Kafka.Brokers, appConfig.Kafka.Topic)
+	kafkaProducer := producer.NewKafkaProducer(appConfig.Kafka.Brokers)
 
-	usecase := usecase.NewAuthUsecaseRegistry(keyCloakClient, *repository, kafkaProducer)
+	usecase := usecase.NewAuthUsecaseRegistry(keyCloakClient, *repository, kafkaProducer, *appConfig)
 
 	controller := controller.NewAuthControllerRegistry(usecase)
 

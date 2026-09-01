@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "user-management-service/proto/user";
+
+service UserStatusService {
+  rpc GetUserStatus (GetUserStatusRequest) returns (GetUserStatusResponse);
+}
+
+message GetUserStatusRequest {
+  string user_id = 1;
+}
+
+message GetUserStatusResponse {
+  string user_id = 1;
+  string status = 2;
+}

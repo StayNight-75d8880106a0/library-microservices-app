@@ -2,9 +2,13 @@ package usecase
 
 import (
 	"context"
+	"log"
 	"time"
+	"user-management-services/internal/config"
 	"user-management-services/internal/dto"
 	"user-management-services/internal/helper"
+	"user-management-services/internal/infrastructure/kafka/event"
+	"user-management-services/internal/infrastructure/kafka/producer"
 	"user-management-services/internal/infrastructure/keycloak"
 	"user-management-services/internal/models"
 	"user-management-services/internal/repository"
@@ -17,17 +21,22 @@ type UserProfileUsecaseInterface interface {
 	UpdateMyPassword(ctx context.Context, userID string, request *dto.UserUpdatePasswordRequest) error
 	GetMyProfile(ctx context.Context, userID string) (*dto.UserResponse, error)
 	CreateUserFromEvent(ctx context.Context, payload *dto.UserCreatedKafkaPayloadConsumer) error
+	GetUserStatus(ctx context.Context, userID string) (string, error)
 }
 
 type UserProfileUsecase struct {
-	keycloak   keycloak.KeycloakUserInterface
-	repository repository.UserRepositoryInterface
+	keycloak      keycloak.KeycloakUserInterface
+	repository    repository.UserRepositoryInterface
+	kafkaProducer *producer.KafkaProducer
+	cfg           *config.AppConfig
 }
 
-func NewUserProfileUsecaseRegistry(keycloakCLient keycloak.KeycloakUserInterface, userRepository repository.UserRepositoryInterface) *UserProfileUsecase {
+func NewUserProfileUsecaseRegistry(keycloakCLient keycloak.KeycloakUserInterface, userRepository repository.UserRepositoryInterface, kafkaProducer *producer.KafkaProducer, cfg *config.AppConfig) *UserProfileUsecase {
 	return &UserProfileUsecase{
-		keycloak:   keycloakCLient,
-		repository: userRepository,
+		keycloak:      keycloakCLient,
+		repository:    userRepository,
+		kafkaProducer: kafkaProducer,
+		cfg:           cfg,
 	}
 }
 
@@ -96,6 +105,20 @@ func (u *UserProfileUsecase) UpdateMyProfile(ctx context.Context, userID string,
 	if errUpdateProfileDB != nil {
 		return helper.NewInternalServerError("Failed to Update User Profile!", helper.ErrorDetail{Detail: errUpdateProfileDB.Error()})
 	}
+
+	event := &event.UserUpdatedEvent{
+		EventType: "USER_STATUS_UPDATED",
+		UserID:    userID,
+		Status:    string(userDB.ProfileStatus),
+		UpdatedAt: time.Now(),
+	}
+
+	go func() {
+		errPublish := u.kafkaProducer.PublishEvent(context.Background(), event, userID, u.cfg.Kafka.TopicUserUpdated)
+		if errPublish != nil {
+			log.Printf("[Kafka Publish Error] Failed to send event for user %s: %v", userID, errPublish)
+		}
+	}()
 
 	return nil
 }
@@ -200,4 +223,19 @@ func (u *UserProfileUsecase) CreateUserFromEvent(ctx context.Context, payload *d
 	}
 
 	return nil
+}
+
+func (u *UserProfileUsecase) GetUserStatus(ctx context.Context, userID string) (string, error) {
+
+	userDB, errGetUser := u.repository.GetUserByKeycloakID(ctx, userID)
+
+	if errGetUser != nil {
+		if errGetUser == gorm.ErrRecordNotFound {
+			return "", helper.NewNotFoundError("User Not Found!", helper.ErrorDetail{Detail: "User With ID " + userID + " Not Found!"})
+		}
+		return "", helper.NewInternalServerError("Failed to Get User!", helper.ErrorDetail{Detail: errGetUser.Error()})
+	}
+
+	return string(userDB.ProfileStatus), nil
+
 }

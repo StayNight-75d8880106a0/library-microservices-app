@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"auth-services/internal/config"
 	"auth-services/internal/dto"
 	"auth-services/internal/helper"
 	"auth-services/internal/infrastructure/kafka/event"
@@ -15,7 +16,7 @@ import (
 type AuthUsecaseInterface interface {
 	Login(ctx context.Context, request *dto.LoginRequest) (*dto.LoginResponse, error)
 	RegisterUser(ctx context.Context, request *dto.RegisterUser) error
-	Logout(ctx context.Context, token string, request *dto.RefreshTokenRequest) error
+	Logout(ctx context.Context, token string, request *dto.RefreshTokenRequest, userID string) error
 	Me(ctx context.Context, claims map[string]interface{}) (*dto.MeResponse, error)
 	RefreshToken(ctx context.Context, request *dto.RefreshTokenRequest) (*dto.LoginResponse, error)
 }
@@ -24,13 +25,15 @@ type AuthUsecase struct {
 	keycloak      keycloak.KeycloakClientInterface
 	repository    repository.AuthRepositoryInterface
 	kafkaProducer *producer.KafkaProducer
+	cfg           config.AppConfig
 }
 
-func NewAuthUsecaseRegistry(keycloakClient keycloak.KeycloakClientInterface, authRepository repository.AuthRepository, kafkaProducer *producer.KafkaProducer) *AuthUsecase {
+func NewAuthUsecaseRegistry(keycloakClient keycloak.KeycloakClientInterface, authRepository repository.AuthRepository, kafkaProducer *producer.KafkaProducer, appConfig config.AppConfig) *AuthUsecase {
 	return &AuthUsecase{
 		keycloak:      keycloakClient,
 		repository:    &authRepository,
 		kafkaProducer: kafkaProducer,
+		cfg:           appConfig,
 	}
 }
 
@@ -57,6 +60,25 @@ func (u *AuthUsecase) Login(ctx context.Context, request *dto.LoginRequest) (*dt
 		RefreshTokenExpiresIn: response["refresh_expires_in"].(float64),
 		TokenType:             "Bearer",
 	}
+
+	keycloakUserID, errExtract := helper.ExtractUserIDFromTokenForLogin(result.AccessToken)
+
+	if errExtract != nil {
+		return nil, helper.NewInternalServerError("An Error During Extract User ID From Token", helper.ErrorDetail{Detail: errExtract.Error()})
+	}
+
+	event := &event.UserAuthenticatedEvent{
+		EventType:  "USER_LOGIN",
+		KeycloakID: keycloakUserID,
+		CreatedAt:  time.Now(),
+	}
+
+	go func() {
+		errPublish := u.kafkaProducer.PublishUserCreatedEvent(context.Background(), event, keycloakUserID, u.cfg.Kafka.TopicUserAuthenticated)
+		if errPublish != nil {
+			log.Printf("[Kafka Publish Error] Failed to send event for user %s: %v", keycloakUserID, errPublish)
+		}
+	}()
 
 	return result, nil
 
@@ -126,7 +148,7 @@ func (u *AuthUsecase) RegisterUser(ctx context.Context, request *dto.RegisterUse
 	}
 
 	go func() {
-		errPublish := u.kafkaProducer.PublishUserCreatedEvent(context.Background(), event, keycloakUserID)
+		errPublish := u.kafkaProducer.PublishUserCreatedEvent(context.Background(), event, keycloakUserID, u.cfg.Kafka.TopicUserCreated)
 		if errPublish != nil {
 			log.Printf("[Kafka Publish Error] Failed to send event for user %s: %v", keycloakUserID, errPublish)
 		}
@@ -136,7 +158,7 @@ func (u *AuthUsecase) RegisterUser(ctx context.Context, request *dto.RegisterUse
 
 }
 
-func (u *AuthUsecase) Logout(ctx context.Context, token string, request *dto.RefreshTokenRequest) error {
+func (u *AuthUsecase) Logout(ctx context.Context, token string, request *dto.RefreshTokenRequest, userID string) error {
 
 	if request.RefreshToken == nil || *request.RefreshToken == "" {
 		return helper.NewUnprocessableEntityError("Refresh Token Cannot Be Empty!", helper.ErrorDetail{Detail: "Refresh token is required!"})
@@ -156,6 +178,19 @@ func (u *AuthUsecase) Logout(ctx context.Context, token string, request *dto.Ref
 			return helper.NewInternalServerError("Failed to logout user!", helper.ErrorDetail{Detail: errLogoutRedis.Error()})
 		}
 	}
+
+	event := &event.UserAuthenticatedEvent{
+		EventType:  "USER_LOGOUT",
+		KeycloakID: userID,
+		CreatedAt:  time.Now(),
+	}
+
+	go func() {
+		errPublish := u.kafkaProducer.PublishUserCreatedEvent(context.Background(), event, userID, u.cfg.Kafka.TopicUserAuthenticated)
+		if errPublish != nil {
+			log.Printf("[Kafka Publish Error] Failed to send event for user %s: %v", userID, errPublish)
+		}
+	}()
 
 	return nil
 }

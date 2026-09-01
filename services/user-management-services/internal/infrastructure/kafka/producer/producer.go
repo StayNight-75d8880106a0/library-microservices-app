@@ -1,9 +1,9 @@
 package producer
 
 import (
-	"auth-services/internal/helper"
 	"context"
 	"encoding/json"
+	"user-management-services/internal/helper"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -23,7 +23,7 @@ func NewKafkaProducer(brokers []string) *KafkaProducer {
 	}
 }
 
-func (kp *KafkaProducer) PublishUserCreatedEvent(ctx context.Context, event interface{}, key string, topic string) error {
+func (kp *KafkaProducer) PublishEvent(ctx context.Context, event interface{}, key string, topic string) error {
 
 	payload, errPayload := json.Marshal(event)
 

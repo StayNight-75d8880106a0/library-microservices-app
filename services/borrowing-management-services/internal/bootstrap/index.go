@@ -3,8 +3,8 @@ package bootstrap
 import (
 	"borrowing-management-services/internal/config"
 	"borrowing-management-services/internal/infrastructure/database"
-	"borrowing-management-services/internal/infrastructure/redis/cache"
-	"borrowing-management-services/internal/infrastructure/redis/persistence"
+	redisdb "borrowing-management-services/internal/infrastructure/redis"
+	"borrowing-management-services/internal/registry/initregistry"
 	"context"
 	"fmt"
 	"log"
@@ -30,16 +30,10 @@ func InitApp() {
 		log.Fatalf("Failed to connect to Mysql: %v", errConnectMysql)
 	}
 
-	errConnectRedisCache := cache.ConnectRedis(ctx)
+	errConnectRedisCache := redisdb.ConnectRedis(ctx)
 
 	if errConnectRedisCache != nil {
 		log.Fatalf("Failed to connect to Redis Cache: %v", errConnectRedisCache)
-	}
-
-	errConnectRedisPersistence := persistence.ConnectRedis(ctx)
-
-	if errConnectRedisPersistence != nil {
-		log.Fatalf("Failed to connect to Redis Persistence: %v", errConnectRedisPersistence)
 	}
 
 	jwksURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/certs", appConfig.Keycloak.KeycloakURL, appConfig.Keycloak.Realm)
@@ -51,6 +45,18 @@ func InitApp() {
 	}
 
 	app := gin.Default()
+
+	modules := initregistry.NewInitRegistry(redisdb.RDS, appConfig)
+
+	go modules.KafkaCacheRegistry.AuthConsumer.StartConsuming(
+		ctx,
+		modules.KafkaCacheRegistry.EventHandler.HandleUserAuthEvent,
+	)
+
+	go modules.KafkaCacheRegistry.StatusConsumer.StartConsuming(
+		ctx,
+		modules.KafkaCacheRegistry.EventHandler.HandleUserStatusUpdateEvent,
+	)
 
 	srv := &http.Server{Addr: ":" + appConfig.PortConfig.PORT, Handler: app}
 
@@ -67,5 +73,7 @@ func InitApp() {
 	defer cancel()
 
 	srv.Shutdown(shutdownCtx)
+	modules.KafkaCacheRegistry.AuthConsumer.Close()
+	modules.KafkaCacheRegistry.StatusConsumer.Close()
 
 }

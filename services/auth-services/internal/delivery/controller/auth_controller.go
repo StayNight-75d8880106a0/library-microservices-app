@@ -96,10 +96,11 @@ func (c *AuthController) Logout(ctx *gin.Context) {
 	}
 
 	authHeader := ctx.GetHeader("Authorization")
+	userID := ctx.GetString("user_id")
 
 	token := strings.Replace(authHeader, "Bearer ", "", 1)
 
-	err := c.usecase.Logout(contextVariable, token, request)
+	err := c.usecase.Logout(contextVariable, token, request, userID)
 
 	if err != nil {
 		if errors.Is(contextVariable.Err(), context.DeadlineExceeded) {

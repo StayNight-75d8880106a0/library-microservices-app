@@ -58,24 +58,37 @@ func NewDatabaseConfig() *DatabaseConfig {
 }
 
 type KafkaConfig struct {
-	Brokers []string
-	Topic   string
-	GroupID string
+	Brokers          []string
+	TopicUserCreated string
+	TopicUserUpdated string
+	GroupID          string
 }
 
 func NewKafkaConfig() *KafkaConfig {
 	return &KafkaConfig{
-		Brokers: []string{os.Getenv("KAFKA_BROKERS")},
-		Topic:   os.Getenv("KAFKA_TOPIC_USER_CREATED"),
-		GroupID: os.Getenv("KAFKA_CONSUMER_GROUP_USER_MANAGEMENT"),
+		Brokers:          []string{os.Getenv("KAFKA_BROKERS")},
+		TopicUserCreated: os.Getenv("KAFKA_TOPIC_USER_CREATED"),
+		TopicUserUpdated: os.Getenv("KAFKA_TOPIC_USER_UPDATED"),
+		GroupID:          os.Getenv("KAFKA_CONSUMER_GROUP_USER_MANAGEMENT"),
+	}
+}
+
+type GrpcConfig struct {
+	PORT string
+}
+
+func NewgRPCConfig() *GrpcConfig {
+	return &GrpcConfig{
+		PORT: os.Getenv("USER_MANAGEMENT_GRPC_PORT"),
 	}
 }
 
 type AppConfig struct {
-	Port     *PortConfig
-	Keycloak *KeycloakConfig
-	DB       *DatabaseConfig
-	Kafka    *KafkaConfig
+	Port       *PortConfig
+	Keycloak   *KeycloakConfig
+	DB         *DatabaseConfig
+	Kafka      *KafkaConfig
+	GrpcConfig *GrpcConfig
 }
 
 func NewAppConfig() *AppConfig {
@@ -88,9 +101,10 @@ func NewAppConfig() *AppConfig {
 	}
 
 	return &AppConfig{
-		Port:     NewPortConfig(),
-		Keycloak: NewKeycloakConfig(),
-		DB:       NewDatabaseConfig(),
-		Kafka:    NewKafkaConfig(),
+		Port:       NewPortConfig(),
+		Keycloak:   NewKeycloakConfig(),
+		DB:         NewDatabaseConfig(),
+		Kafka:      NewKafkaConfig(),
+		GrpcConfig: NewgRPCConfig(),
 	}
 }

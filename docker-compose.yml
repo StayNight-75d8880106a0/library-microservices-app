@@ -124,27 +124,6 @@ services:
       timeout: 6s
       retries: 7
 
-  redis-persistence:
-    image: redis:8.6.4
-    container_name: library-app-redis-persistence
-    restart: unless-stopped
-    ports:
-      - "${REDIS_PERSISTENCE_PORT_EXPOSE}:${REDIS_PORT}"
-    environment:
-      REDIS_PASSWORD: ${REDIS_PERSISTENCE_PASSWORD}
-      REDIS_DATABASES: ${REDIS_DB_PERSISTENCE}
-      REDIS_HOST: ${REDIS_PERSISTENCE_HOST}
-    networks:
-      - app_network
-    command: [ "redis-server", "--requirepass", "${REDIS_PERSISTENCE_PASSWORD}", "--appendonly", "yes", "--appendfsync", "everysec"]
-    volumes:
-      - redis_data_persistence:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PERSISTENCE_PASSWORD}", "ping"]
-      interval: 11s
-      timeout: 6s
-      retries: 7
-
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
     container_name: elasticsearch
@@ -314,8 +293,6 @@ services:
     depends_on:
       redis-cache:
         condition: service_healthy
-      redis-persistence:
-        condition: service_healthy
       keycloak:
         condition: service_healthy
       borrowing-management-db:
@@ -333,8 +310,6 @@ volumes:
   book_management_data:
     driver: local
   es_data:
-    driver: local
-  redis_data_persistence:
     driver: local
   borrowing_management_data:
     driver: local

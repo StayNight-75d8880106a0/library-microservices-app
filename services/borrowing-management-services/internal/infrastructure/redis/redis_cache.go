@@ -1,4 +1,4 @@
-package cache
+package redisdb
 
 import (
 	"borrowing-management-services/internal/config"

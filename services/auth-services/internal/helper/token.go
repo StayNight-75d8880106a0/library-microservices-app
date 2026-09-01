@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -72,5 +73,20 @@ func CalculateTokenRemainingTTL(tokenString string) time.Duration {
 	}
 
 	return remainingTTL
+
+}
+
+func ExtractUserIDFromTokenForLogin(tokenString string) (string, error) {
+
+	token, _, err := jwt.NewParser().ParseUnverified(tokenString, jwt.MapClaims{})
+	if err != nil {
+		return "", err
+	}
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if sub, ok := claims["sub"].(string); ok {
+			return sub, nil
+		}
+	}
+	return "", errors.New("sub claim not found in token")
 
 }

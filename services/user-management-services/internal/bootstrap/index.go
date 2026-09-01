@@ -8,6 +8,7 @@ import (
 	"time"
 	"user-management-services/internal/config"
 	"user-management-services/internal/database"
+	"user-management-services/internal/delivery/grpc"
 	"user-management-services/internal/delivery/router/initrouter"
 	"user-management-services/internal/registry/initregistry"
 
@@ -18,6 +19,9 @@ import (
 func InitApp() {
 
 	gin.SetMode(gin.ReleaseMode)
+
+	ctx, cancelConsumer := context.WithCancel(context.Background())
+	defer cancelConsumer()
 
 	appConfig := config.NewAppConfig()
 
@@ -40,11 +44,16 @@ func InitApp() {
 	modules := initregistry.NewInitRegistry(appConfig, database.DB)
 	initrouter.InitRouter(app, modules, jwks, appConfig)
 
-	ctx, cancelConsumer := context.WithCancel(context.Background())
-	defer cancelConsumer()
-
 	modules.User.UserConsumer.StartConsuming(ctx)
 	defer modules.User.UserConsumer.Close()
+
+	grpcServer, errGrpcServer := grpc.NewGrpcServer(appConfig.GrpcConfig.PORT, modules.User.UserUsecase)
+
+	if errGrpcServer != nil {
+		log.Fatalf("Failed to initialize gRPC Server: %v", err)
+	}
+	grpcServer.Start()
+	defer grpcServer.Stop()
 
 	srv := &http.Server{Addr: ":" + appConfig.Port.PORT, Handler: app}
 
@@ -62,5 +71,4 @@ func InitApp() {
 
 	srv.Shutdown(shutdownCtx)
 	modules.User.UserConsumer.Close()
-
 }
