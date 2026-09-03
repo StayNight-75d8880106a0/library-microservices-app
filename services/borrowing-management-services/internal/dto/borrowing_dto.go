@@ -2,15 +2,24 @@ package dto
 
 import "time"
 
-type UserAuthKafkaPayloadConsumer struct {
-	EventType  string    `json:"eventType"`
-	KeycloakID string    `json:"keycloakId"`
-	CreatedAt  time.Time `json:"createdAt"`
+type CreateBorrowingRequest struct {
+	BookID  *string    `json:"bookID" binding:"required"`
+	Duedate *time.Time `json:"dueDate"`
 }
 
-type UserStatusUpdatedKafkaPayloadConsumer struct {
-	EventType string    `json:"eventType"`
-	UserID    string    `json:"userId"`
-	Status    string    `json:"status"`
-	UpdatedAt time.Time `json:"updatedAt"`
+type BorrowingResponse struct {
+	ID         string `json:"ID"`
+	UserID     string `json:"userID"`
+	BookID     string `json:"bookID"`
+	BorrowCode string `json:"borrowCode"`
+	BorrowedAt string `json:"borrowedAt"`
+	DueDate    string `json:"dueDate"`
+	ReturnedAt string `json:"returnedAt"`
+	Status     string `json:"status"`
+	CreatedAt  string `json:"createdAt"`
+	UpdatedAt  string `json:"updatedAt"`
+}
+
+type BorrowingUpdateRequest struct {
+	Status *string `json:"status" binding:"required"`
 }

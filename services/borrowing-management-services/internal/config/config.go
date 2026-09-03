@@ -69,24 +69,6 @@ func NewRedisCacheConfig() *RedisCacheConfig {
 	}
 }
 
-type RedisPersistenceConfig struct {
-	RedisPersistenceHost     string
-	RedisPersistencePort     string
-	RedisPersistencePassword string
-	RedisPersistenceDB       int
-}
-
-func NewRedisPersistenceConfig() *RedisPersistenceConfig {
-	redisDB, _ := strconv.Atoi(os.Getenv("REDIS_PERSISTENCE_DB"))
-
-	return &RedisPersistenceConfig{
-		RedisPersistenceHost:     os.Getenv("REDIS_PERSISTENCE_HOST"),
-		RedisPersistencePort:     os.Getenv("REDIS_PORT"),
-		RedisPersistencePassword: os.Getenv("REDIS_PERSISTENCE_PASSWORD"),
-		RedisPersistenceDB:       redisDB,
-	}
-}
-
 type KeycloakConfig struct {
 	KeycloakURL    string
 	KeycloakRealm  string
@@ -122,12 +104,11 @@ func NewKafkaConfig() *KafkaConfig {
 }
 
 type AppConfig struct {
-	PortConfig             *PortConfig
-	MySQLConfig            *MySQLConfig
-	RedisCacheConfig       *RedisCacheConfig
-	RedisPersistenceConfig *RedisPersistenceConfig
-	Keycloak               *KeycloakConfig
-	Kafka                  *KafkaConfig
+	PortConfig       *PortConfig
+	MySQLConfig      *MySQLConfig
+	RedisCacheConfig *RedisCacheConfig
+	Keycloak         *KeycloakConfig
+	Kafka            *KafkaConfig
 }
 
 func NewAppConfig() *AppConfig {
@@ -140,11 +121,10 @@ func NewAppConfig() *AppConfig {
 	}
 
 	return &AppConfig{
-		PortConfig:             NewPortConfig(),
-		MySQLConfig:            NewMySQLConfig(),
-		RedisCacheConfig:       NewRedisCacheConfig(),
-		RedisPersistenceConfig: NewRedisPersistenceConfig(),
-		Keycloak:               NewKeycloakConfig(),
-		Kafka:                  NewKafkaConfig(),
+		PortConfig:       NewPortConfig(),
+		MySQLConfig:      NewMySQLConfig(),
+		RedisCacheConfig: NewRedisCacheConfig(),
+		Keycloak:         NewKeycloakConfig(),
+		Kafka:            NewKafkaConfig(),
 	}
 }

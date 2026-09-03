@@ -2,6 +2,7 @@ CREATE TABLE borrowings (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     book_id VARCHAR(36) NOT NULL,
+    borrow_code VARCHAR(255) UNIQUE NOT NULL,
     borrowed_at DATETIME NOT NULL,
     due_date DATETIME NOT NULL,
     returned_at DATETIME NULL,
@@ -11,5 +12,6 @@ CREATE TABLE borrowings (
     
     INDEX idx_user_id (user_id),
     INDEX idx_book_id (book_id),
+    INDEX idx_borrow_code (borrow_code),
     INDEX idx_status (status)
 );

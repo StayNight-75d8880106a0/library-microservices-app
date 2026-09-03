@@ -11,7 +11,7 @@ import (
 
 func AdminRouter(app *gin.Engine, AdminController *controller.AdminController, jwks keyfunc.Keyfunc, cfg *config.AppConfig) {
 
-	admin := app.Group("/api/v1/user-management", middleware.AuthMiddleware(jwks, cfg), middleware.RequireRole("SUPER_ADMIN"))
+	admin := app.Group("/api/v1/user", middleware.AuthMiddleware(jwks, cfg), middleware.RequireRole("SUPER_ADMIN"))
 
 	admin.GET("", AdminController.GetAllUsers)
 	admin.POST("", AdminController.CreateAdmin)

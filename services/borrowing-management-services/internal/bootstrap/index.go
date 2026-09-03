@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"borrowing-management-services/internal/config"
+	"borrowing-management-services/internal/delivery/router/initrouter"
 	"borrowing-management-services/internal/infrastructure/database"
 	redisdb "borrowing-management-services/internal/infrastructure/redis"
 	"borrowing-management-services/internal/registry/initregistry"
@@ -38,7 +39,7 @@ func InitApp() {
 
 	jwksURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/certs", appConfig.Keycloak.KeycloakURL, appConfig.Keycloak.Realm)
 
-	_, err := keyfunc.NewDefault([]string{jwksURL})
+	jwks, err := keyfunc.NewDefault([]string{jwksURL})
 
 	if err != nil {
 		log.Fatalf("Failed to fetch JWKS from Keycloak: %v", err)
@@ -46,7 +47,8 @@ func InitApp() {
 
 	app := gin.Default()
 
-	modules := initregistry.NewInitRegistry(redisdb.RDS, appConfig)
+	modules := initregistry.NewInitRegistry(redisdb.RDS, appConfig, database.DB)
+	initrouter.InitRouter(app, modules, jwks, appConfig)
 
 	go modules.KafkaCacheRegistry.AuthConsumer.StartConsuming(
 		ctx,

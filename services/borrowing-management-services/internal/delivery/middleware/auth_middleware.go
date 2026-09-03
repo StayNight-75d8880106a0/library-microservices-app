@@ -63,8 +63,18 @@ func AuthMiddleware(jwks keyfunc.Keyfunc, cfg *config.AppConfig) gin.HandlerFunc
 			return
 		}
 
+		realmAccess, _ := claims["realm_access"].(map[string]interface{})
+		rolesRaw, _ := realmAccess["roles"].([]interface{})
+		var roles []string
+		for _, role := range rolesRaw {
+			if roleStr, ok := role.(string); ok {
+				roles = append(roles, roleStr)
+			}
+		}
+
 		ctx.Set("userID", userID)
 		ctx.Set("claims", claims)
+		ctx.Set("isAdmin", helper.IsRoleMatch(roles, "SUPER_ADMIN", "ADMIN"))
 
 	}
 }
