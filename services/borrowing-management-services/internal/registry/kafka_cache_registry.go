@@ -22,13 +22,16 @@ func NewKafkaCacheRegistryModule(rds *redis.Client, cfg *config.AppConfig) *Kafk
 
 	userCacheRepo := repository.NewUserRedisCache(rds)
 
-	userGrpcClient, _ := client.NewUserGrpcClient(cfg.PortConfig.GRPC)
+	userGrpcClient, err := client.NewUserGrpcClient(cfg.PortConfig.GRPCHOST + ":" + cfg.PortConfig.GRPC)
+	if err != nil {
+		panic(err)
+	}
 
 	eventHandler := event.NewEventHandler(userCacheRepo, userGrpcClient)
 
-	authConsumer := consume.NewKafkaConsumer(cfg.Kafka.Brokers, cfg.Kafka.TopicUserAuthenticated, cfg.Kafka.GroupID, eventHandler)
+	authConsumer := consume.NewKafkaConsumer(cfg.Kafka.Brokers, cfg.Kafka.TopicUserAuthenticated+"-auth", cfg.Kafka.GroupID, eventHandler)
 
-	statusConsumer := consume.NewKafkaConsumer(cfg.Kafka.Brokers, cfg.Kafka.TopicUserStatusUpdated, cfg.Kafka.GroupID, eventHandler)
+	statusConsumer := consume.NewKafkaConsumer(cfg.Kafka.Brokers, cfg.Kafka.TopicUserStatusUpdated+"-status", cfg.Kafka.GroupID, eventHandler)
 
 	return &KafkaCacheRegistryModule{
 		UserCacheRepo:  userCacheRepo,

@@ -20,6 +20,7 @@ type BookUsecaseInterface interface {
 	GetBookByID(ctx context.Context, ID string) (*dto.BookResponse, error)
 	DeleteBook(ctx context.Context, ID string) error
 	UpdateBook(ctx context.Context, request *dto.UpdateBookRequest, ID string) (*dto.BookResponse, error)
+	UpdateAvaliableStock(ctx context.Context, payload *dto.BorrowingCreatedEvent) error
 }
 
 type BookUsecase struct {
@@ -359,5 +360,28 @@ func (u *BookUsecase) UpdateBook(ctx context.Context, request *dto.UpdateBookReq
 	}
 
 	return result, nil
+
+}
+
+func (u *BookUsecase) UpdateAvaliableStock(ctx context.Context, payload *dto.BorrowingCreatedEvent) error {
+
+	if payload.BookID == "" {
+		return helper.NewUnprocessableEntityError("Book ID Cannot Be Empty!", helper.ErrorDetail{Detail: "Book ID is required!"})
+	}
+
+	if payload.Quantity < 0 {
+		return helper.NewUnprocessableEntityError("Quantity Cannot Be Negative!", helper.ErrorDetail{Detail: "Quantity cannot be negative!"})
+	}
+
+	errUpdate := u.repository.UpdateAvaliableStock(ctx, payload.BookID, payload.Quantity, payload.Action)
+
+	if errUpdate != nil {
+		if errors.Is(errUpdate, gorm.ErrRecordNotFound) {
+			return helper.NewNotFoundError("Book Not Found!", helper.ErrorDetail{})
+		}
+		return helper.NewInternalServerError("An Error During Update Available Stock!", helper.ErrorDetail{Detail: errUpdate.Error()})
+	}
+
+	return nil
 
 }

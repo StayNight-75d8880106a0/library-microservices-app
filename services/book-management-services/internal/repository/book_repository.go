@@ -15,6 +15,7 @@ type BookRepositoryInterface interface {
 	GetById(ctx context.Context, ID string) (*models.Books, error)
 	Delete(ctx context.Context, ID string) error
 	Update(ctx context.Context, book *models.Books, ID string) error
+	UpdateAvaliableStock(ctx context.Context, ID string, quantity int, action string) error
 }
 
 type BookRepository struct {
@@ -84,5 +85,25 @@ func (repo *BookRepository) Update(ctx context.Context, book *models.Books, ID s
 	errUpdate := repo.DB.WithContext(ctx).Table("books").Where("id = ?", ID).Updates(book).Error
 
 	return errUpdate
+
+}
+
+func (repo *BookRepository) UpdateAvaliableStock(ctx context.Context, ID string, quantity int, action string) error {
+
+	var errUpadate error
+
+	if action == "RETURNED" {
+		errUpadate = repo.DB.WithContext(ctx).Table("books").Where("id = ? AND available_stock >= ?", ID, quantity).Updates(map[string]interface{}{
+			"available_stock": gorm.Expr("available_stock + ?", quantity),
+			"updated_at":      gorm.Expr("NOW()"),
+		}).Error
+	} else if action == "BORROWED" {
+		errUpadate = repo.DB.WithContext(ctx).Table("books").Where("id = ? AND available_stock >= ?", ID, quantity).Updates(map[string]interface{}{
+			"available_stock": gorm.Expr("available_stock - ?", quantity),
+			"updated_at":      gorm.Expr("NOW()"),
+		}).Error
+	}
+
+	return errUpadate
 
 }

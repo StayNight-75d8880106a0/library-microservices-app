@@ -60,6 +60,9 @@ func (h *EventHandler) HandleUserAuthEvent(ctx context.Context, messageBytes []b
 			return errCache
 		}
 		log.Printf("✅ [Event USER_LOGOUT] Successfully deleted user status for user_id: %s", event.KeycloakID)
+	default:
+		log.Printf("[Kafka Handler Error] Unknown event type: %s", event.EventType)
+		return nil
 	}
 
 	return nil

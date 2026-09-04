@@ -1,9 +1,11 @@
 package helper
 
-func IsRoleMatch(roles []string, target string) bool {
+func IsRoleMatch(roles []string, targets ...string) bool {
 	for _, r := range roles {
-		if r == target {
-			return true
+		for _, t := range targets {
+			if r == t {
+				return true
+			}
 		}
 	}
 	return false

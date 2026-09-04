@@ -173,6 +173,7 @@ services:
     restart: unless-stopped
     ports:
       - ${USER_MANAGEMENT_PORT}:${USER_MANAGEMENT_PORT}
+      - ${USER_MANAGEMENT_GRPC_PORT}:${USER_MANAGEMENT_GRPC_PORT}
     env_file:
       - .env.shared
       - ./services/user-management-services/.env.docker

@@ -56,6 +56,9 @@ func InitApp() {
 	modules := initialregistry.NewInitRegistry(mysql.DB, redisdb.RDS, elasticsearch.ElasticseearchClient, appConfig)
 	initrouter.InitRouter(app, modules, jwks, appConfig)
 
+	modules.Book.BookConsumer.StartConsuming(ctx)
+	defer modules.Book.BookConsumer.Close()
+
 	srv := &http.Server{Addr: ":" + appConfig.PortConfig.PORT, Handler: app}
 
 	go func() {
@@ -71,4 +74,5 @@ func InitApp() {
 	defer cancel()
 
 	srv.Shutdown(shutdownCtx)
+	modules.Book.BookConsumer.Close()
 }

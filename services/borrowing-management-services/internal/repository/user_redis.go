@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -24,6 +25,8 @@ func NewUserRedisCache(redis *redis.Client) *UserRedisCache {
 	}
 }
 
+var ErrUserStatusNotFound = errors.New("user status not found in cache")
+
 func (r *UserRedisCache) getKey(userID string) string {
 	return fmt.Sprintf("user:status:%s", userID)
 }
@@ -44,9 +47,10 @@ func (r *UserRedisCache) GetUserStatus(ctx context.Context, userID string) (stri
 	status, errRedis := r.rds.Get(ctx, key).Result()
 
 	if errRedis != nil {
-		if errRedis == redis.Nil {
-			return "", nil
+		if errors.Is(errRedis, redis.Nil) {
+			return "", ErrUserStatusNotFound
 		}
+		return "", errRedis
 	}
 
 	return status, nil

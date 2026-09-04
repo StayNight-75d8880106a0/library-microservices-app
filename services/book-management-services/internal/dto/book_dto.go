@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 type OpenLibraryBook struct {
 	Title         string   `json:"title"`
 	Authors       []string `json:"authors"`
@@ -60,4 +62,11 @@ type GetBooksQuery struct {
 	Limit    int    `form:"limit,default=10"`
 	Keywords string `form:"keywords"`
 	Category string `form:"category"`
+}
+
+type BorrowingCreatedEvent struct {
+	BookID    string    `json:"bookID"`
+	Quantity  int       `json:"quantity"`
+	Action    string    `json:"action"`
+	CreatedAt time.Time `json:"createdAt"`
 }

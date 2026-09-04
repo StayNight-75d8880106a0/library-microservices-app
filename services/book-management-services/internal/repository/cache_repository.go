@@ -99,3 +99,17 @@ func (repo *BookCacheRepository) Update(ctx context.Context, book *models.Books,
 	return err
 
 }
+
+func (repo *BookCacheRepository) UpdateAvaliableStock(ctx context.Context, ID string, quantity int, action string) error {
+
+	err := repo.base.UpdateAvaliableStock(ctx, ID, quantity, action)
+
+	if err == nil && repo.rds != nil {
+		cacheKey := "book:" + ID
+
+		repo.rds.Del(ctx, cacheKey)
+	}
+
+	return err
+
+}

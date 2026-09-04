@@ -105,6 +105,22 @@ func NewOpenLibraryAPIConfig() *OpenLibraryAPIConfig {
 	}
 }
 
+type KafkaConfig struct {
+	Brokers                []string
+	GroupID                string
+	TopicUserAuthenticated string
+	TopicUserStatusUpdated string
+	TopicBorrowingCreated  string
+}
+
+func NewKafkaConfig() *KafkaConfig {
+	return &KafkaConfig{
+		Brokers:               []string{os.Getenv("KAFKA_BROKERS")},
+		GroupID:               os.Getenv("KAFKA_CONSUMER_GROUP_BOOK_MANAGEMENT"),
+		TopicBorrowingCreated: os.Getenv("KAFKA_TOPIC_BBORROWING_CREATED"),
+	}
+}
+
 type AppConfig struct {
 	PortConfig     *PortConfig
 	MySQLConfig    *MySQLConfig
@@ -112,6 +128,7 @@ type AppConfig struct {
 	Keycloak       *KeycloakConfig
 	Elasticsearch  *ElasticsearchConfig
 	OpenLibraryAPI *OpenLibraryAPIConfig
+	KafkaConfig    *KafkaConfig
 }
 
 func NewAppConfig() *AppConfig {
@@ -130,5 +147,6 @@ func NewAppConfig() *AppConfig {
 		Keycloak:       NewKeycloakConfig(),
 		Elasticsearch:  NewElasticsearchConfig(),
 		OpenLibraryAPI: NewOpenLibraryAPIConfig(),
+		KafkaConfig:    NewKafkaConfig(),
 	}
 }

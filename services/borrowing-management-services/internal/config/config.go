@@ -10,14 +10,16 @@ import (
 )
 
 type PortConfig struct {
-	PORT string
-	GRPC string
+	PORT     string
+	GRPC     string
+	GRPCHOST string
 }
 
 func NewPortConfig() *PortConfig {
 	return &PortConfig{
-		PORT: os.Getenv("BORROWING_MANAGEMENT_PORT"),
-		GRPC: os.Getenv("USER_MANAGEMENT_GRPC_PORT"),
+		PORT:     os.Getenv("BORROWING_MANAGEMENT_PORT"),
+		GRPCHOST: os.Getenv("USER_MANAGEMENT_GRPC_HOST"),
+		GRPC:     os.Getenv("USER_MANAGEMENT_GRPC_PORT"),
 	}
 }
 
@@ -92,6 +94,7 @@ type KafkaConfig struct {
 	GroupID                string
 	TopicUserAuthenticated string
 	TopicUserStatusUpdated string
+	TopicBorrowingCreated  string
 }
 
 func NewKafkaConfig() *KafkaConfig {
@@ -100,6 +103,7 @@ func NewKafkaConfig() *KafkaConfig {
 		GroupID:                os.Getenv("BORROWING_MANAGEMENT_GROUP_ID"),
 		TopicUserAuthenticated: os.Getenv("KAFKA_TOPIC_USER_LOGIN"),
 		TopicUserStatusUpdated: os.Getenv("KAFKA_TOPIC_USER_UPDATED"),
+		TopicBorrowingCreated:  os.Getenv("KAFKA_TOPIC_BBORROWING_CREATED"),
 	}
 }
 
