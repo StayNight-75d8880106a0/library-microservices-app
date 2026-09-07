@@ -131,9 +131,27 @@ func (kc *KeycloakClient) RegisterUser(ctx context.Context, adminToken string, p
 
 	defer response.Body.Close()
 
-	if response.StatusCode != http.StatusCreated {
-		bodyBytes, _ := io.ReadAll(response.Body)
-		return "", helper.NewInternalServerError("Failed to register user in keycloak!", helper.ErrorDetail{Detail: string(bodyBytes)})
+	bodyBytes, _ := io.ReadAll(response.Body)
+
+	switch response.StatusCode {
+
+	case http.StatusConflict:
+		return "", helper.NewConflictError(
+			"User already exists!",
+			helper.ErrorDetail{Detail: string(bodyBytes)},
+		)
+
+	case http.StatusBadRequest:
+		return "", helper.NewUnprocessableEntityError(
+			"Invalid registration data!",
+			helper.ErrorDetail{Detail: string(bodyBytes)},
+		)
+
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return "", helper.NewInternalServerError(
+			"Unauthorized to register user!",
+			helper.ErrorDetail{Detail: string(bodyBytes)},
+		)
 	}
 
 	locationHeader := response.Header.Get("Location")

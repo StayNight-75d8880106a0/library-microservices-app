@@ -11,4 +11,5 @@ import (
 
 func InitRouter(app *gin.Engine, modules *initregistry.Module, jwks keyfunc.Keyfunc, cfg *config.AppConfig) {
 	router.BorrowingRouter(app, modules.BorrowingRegistry.BorrowingController, jwks, cfg)
+	router.WaitingListRouter(app, modules.WaitingListRegistry.WaitingListController, jwks, cfg)
 }

@@ -1,0 +1,1 @@
+ALTER TABLE waiting_lists DROP INDEX uq_book_queue;

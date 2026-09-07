@@ -21,6 +21,8 @@ func NewBorrowingRegistryModule(db *gorm.DB, rds *redis.Client, cfg *config.AppC
 
 	borrowingRepository := repository.NewBorrowingUserRepository(db)
 
+	waitingListRepository := repository.NewWaitingListRepository(db)
+
 	cacheRepository := cache.NewBorrowingUserCacheRepository(borrowingRepository, rds, cfg.RedisCacheConfig)
 
 	userCache := repository.NewUserRedisCache(rds)
@@ -29,7 +31,7 @@ func NewBorrowingRegistryModule(db *gorm.DB, rds *redis.Client, cfg *config.AppC
 
 	userGrpc, _ := client.NewUserGrpcClient(cfg.PortConfig.GRPCHOST + ":" + cfg.PortConfig.GRPC)
 
-	usecase := usecase.NewBorrowingUsecase(cacheRepository, userCache, kafkaProducer, cfg, userGrpc)
+	usecase := usecase.NewBorrowingUsecase(cacheRepository, userCache, kafkaProducer, cfg, userGrpc, waitingListRepository)
 
 	controller := controller.NewBorrowingController(usecase)
 

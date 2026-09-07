@@ -23,26 +23,27 @@ import (
 type BorrowingUsecaseInterface interface {
 	CreateBorrowing(ctx context.Context, request *dto.CreateBorrowingRequest, userID string) (*dto.BorrowingResponse, error)
 	GetAllBorrowings(ctx context.Context, limit int, page int, role bool, userID string) ([]dto.BorrowingResponse, helper.PaginationMeta, error)
-	GetBorrowingByID(ctx context.Context, ID string) (*dto.BorrowingResponse, error)
+	GetBorrowingByID(ctx context.Context, ID string, role bool, userID string) (*dto.BorrowingResponse, error)
 	UpdateBorrowingStatus(ctx context.Context, ID string, request *dto.BorrowingUpdateRequest) error
-	GetMyBorrowingByID(ctx context.Context, ID string, userID string) (*dto.BorrowingResponse, error)
 }
 
 type BorrowingUsecase struct {
-	repository    repository.BorrowingUserRepositoryInterface
-	userCache     repository.UserRedisCacheInterface
-	kafkaProducer *producer.KafkaProducer
-	cfg           *config.AppConfig
-	userGrpc      client.UserGrpcClientInterface
+	repository            repository.BorrowingUserRepositoryInterface
+	userCache             repository.UserRedisCacheInterface
+	kafkaProducer         *producer.KafkaProducer
+	cfg                   *config.AppConfig
+	userGrpc              client.UserGrpcClientInterface
+	waitingListRepository repository.WaitingListRepositoryInterface
 }
 
-func NewBorrowingUsecase(borrowingRepository repository.BorrowingUserRepositoryInterface, userCache repository.UserRedisCacheInterface, kafkaProducer *producer.KafkaProducer, cfg *config.AppConfig, userGrpc client.UserGrpcClientInterface) *BorrowingUsecase {
+func NewBorrowingUsecase(borrowingRepository repository.BorrowingUserRepositoryInterface, userCache repository.UserRedisCacheInterface, kafkaProducer *producer.KafkaProducer, cfg *config.AppConfig, userGrpc client.UserGrpcClientInterface, waitingListRepository repository.WaitingListRepositoryInterface) *BorrowingUsecase {
 	return &BorrowingUsecase{
-		repository:    borrowingRepository,
-		userCache:     userCache,
-		kafkaProducer: kafkaProducer,
-		cfg:           cfg,
-		userGrpc:      userGrpc,
+		repository:            borrowingRepository,
+		userCache:             userCache,
+		kafkaProducer:         kafkaProducer,
+		cfg:                   cfg,
+		userGrpc:              userGrpc,
+		waitingListRepository: waitingListRepository,
 	}
 }
 
@@ -222,7 +223,7 @@ func (u *BorrowingUsecase) GetAllBorrowings(ctx context.Context, limit int, page
 
 }
 
-func (u *BorrowingUsecase) GetMyBorrowingByID(ctx context.Context, ID string, userID string) (*dto.BorrowingResponse, error) {
+func (u *BorrowingUsecase) GetBorrowingByID(ctx context.Context, ID string, role bool, userID string) (*dto.BorrowingResponse, error) {
 
 	borrowing, errGet := u.repository.GetBorrowingByID(ctx, ID)
 
@@ -231,6 +232,24 @@ func (u *BorrowingUsecase) GetMyBorrowingByID(ctx context.Context, ID string, us
 			return nil, helper.NewNotFoundError("Borrowing Not Found!", helper.ErrorDetail{Detail: "Borrowing with the given ID does not exist!"})
 		}
 		return nil, helper.NewInternalServerError("An Error During Get Borrowing By ID!", helper.ErrorDetail{Detail: errGet.Error()})
+	}
+
+	if role {
+
+		result := &dto.BorrowingResponse{
+			ID:         borrowing.ID,
+			UserID:     borrowing.UserID,
+			BookID:     borrowing.BookID,
+			BorrowCode: borrowing.BorrowCode,
+			BorrowedAt: helper.FormatTimeRFC3339Jakarta(borrowing.BorrowedAt),
+			DueDate:    helper.FormatTimeRFC3339Jakarta(borrowing.DueDate),
+			ReturnedAt: helper.FormatTimeRFC3339JakartaPTR(borrowing.ReturnedAt),
+			Status:     string(borrowing.Status),
+			CreatedAt:  helper.FormatTimeRFC3339Jakarta(borrowing.CreatedAt),
+			UpdatedAt:  helper.FormatTimeRFC3339Jakarta(borrowing.UpdatedAt),
+		}
+
+		return result, nil
 	}
 
 	if borrowing.UserID != userID {
@@ -251,33 +270,7 @@ func (u *BorrowingUsecase) GetMyBorrowingByID(ctx context.Context, ID string, us
 	}
 
 	return result, nil
-}
 
-func (u *BorrowingUsecase) GetBorrowingByID(ctx context.Context, ID string) (*dto.BorrowingResponse, error) {
-
-	borrowing, errGet := u.repository.GetBorrowingByID(ctx, ID)
-
-	if errGet != nil {
-		if errGet == gorm.ErrRecordNotFound {
-			return nil, helper.NewNotFoundError("Borrowing Not Found!", helper.ErrorDetail{Detail: "Borrowing with the given ID does not exist!"})
-		}
-		return nil, helper.NewInternalServerError("An Error During Get Borrowing By ID!", helper.ErrorDetail{Detail: errGet.Error()})
-	}
-
-	result := &dto.BorrowingResponse{
-		ID:         borrowing.ID,
-		UserID:     borrowing.UserID,
-		BookID:     borrowing.BookID,
-		BorrowCode: borrowing.BorrowCode,
-		BorrowedAt: helper.FormatTimeRFC3339Jakarta(borrowing.BorrowedAt),
-		DueDate:    helper.FormatTimeRFC3339Jakarta(borrowing.DueDate),
-		ReturnedAt: helper.FormatTimeRFC3339JakartaPTR(borrowing.ReturnedAt),
-		Status:     string(borrowing.Status),
-		CreatedAt:  helper.FormatTimeRFC3339Jakarta(borrowing.CreatedAt),
-		UpdatedAt:  helper.FormatTimeRFC3339Jakarta(borrowing.UpdatedAt),
-	}
-
-	return result, nil
 }
 
 func (u *BorrowingUsecase) UpdateBorrowingStatus(ctx context.Context, ID string, request *dto.BorrowingUpdateRequest) error {
@@ -293,7 +286,7 @@ func (u *BorrowingUsecase) UpdateBorrowingStatus(ctx context.Context, ID string,
 	switch statusEnum {
 	case models.BorrowingStatusPending, models.BorrowingStatusBorrowing, models.BorrowingStatusReturned:
 	default:
-		return helper.NewUnprocessableEntityError("Invalid Status!", helper.ErrorDetail{Detail: "Status must be PENDING, BORROWING, or RETURNED!"})
+		return helper.NewUnprocessableEntityError("Invalid Status!", helper.ErrorDetail{Detail: "Status must be PENDING, BORROWED, or RETURNED!"})
 	}
 
 	borrowing, errGet := u.repository.GetBorrowingByID(ctx, ID)
@@ -320,6 +313,8 @@ func (u *BorrowingUsecase) UpdateBorrowingStatus(ctx context.Context, ID string,
 			Action:    "RETURNED",
 			CreatedAt: time.Now(),
 		}
+
+		go u.processNextWaitingUser(context.Background(), borrowing.BookID)
 	} else if statusEnum == models.BorrowingStatusBorrowing {
 		borrowingEvent = &event.BorrowingCreatedEvent{
 			BookID:    borrowing.BookID,
@@ -335,6 +330,38 @@ func (u *BorrowingUsecase) UpdateBorrowingStatus(ctx context.Context, ID string,
 			log.Printf("[Kafka Publish Error] Failed to send event for bookID in borrowing service %s: %v", ID, errPublish)
 		}
 	}()
+
+	return nil
+
+}
+
+func (u *BorrowingUsecase) processNextWaitingUser(ctx context.Context, bookID string) error {
+
+	const maxAttempts = 5
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+
+		nextUser, errGet := u.waitingListRepository.GetFirstWaitingListByBookID(ctx, bookID)
+
+		if errGet != nil {
+			if errGet == gorm.ErrRecordNotFound {
+				return nil
+			}
+			return helper.NewInternalServerError("An Error During Get First Waiting List By Book ID!", helper.ErrorDetail{Detail: errGet.Error()})
+		}
+
+		rowsAffected, errUpdate := u.waitingListRepository.UpdateStatusWaitingList(ctx, nextUser.ID, models.WaitingListStatusNotified)
+
+		if errUpdate != nil {
+			return helper.NewInternalServerError("An Error During Update Waiting List Status!", helper.ErrorDetail{Detail: errUpdate.Error()})
+		}
+
+		if rowsAffected > 0 {
+			return nil
+		}
+
+		log.Printf("[WaitingList] Kandidat %s sudah diambil proses lain, lanjut ke antrean berikutnya", nextUser.ID)
+	}
 
 	return nil
 

@@ -23,7 +23,7 @@ type WaitingList struct {
 	ArrivalRate    float64           `gorm:"type:decimal(10,4);not null" json:"arrival_rate"`  // λ (request/jam)
 	ServiceRate    float64           `gorm:"type:decimal(10,4);not null" json:"service_rate"`  // μ (request/jam per server)
 	NumServers     int               `gorm:"type:int;not null" json:"num_servers"`             // c
-	Utilization    float64           `gorm:"type:decimal(6,4);not null" json:"utilization"`    // ρ
+	Utilization    float64           `gorm:"type:decimal(12,4);not null" json:"utilization"`   // ρ
 	ProbWait       float64           `gorm:"type:decimal(6,4);not null" json:"prob_wait"`      // P(wait)
 	AvgQueueLen    float64           `gorm:"type:decimal(10,4);not null" json:"avg_queue_len"` // Lq
 	AvgWaitMin     float64           `gorm:"type:decimal(10,4);not null" json:"avg_wait_min"`  // Wq (menit)

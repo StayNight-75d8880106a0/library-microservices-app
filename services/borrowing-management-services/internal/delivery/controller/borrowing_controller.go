@@ -70,33 +70,16 @@ func (c *BorrowingController) GetALL(ctx *gin.Context) {
 
 }
 
-func (c *BorrowingController) GetMyByID(ctx *gin.Context) {
-
-	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 5*time.Second)
-	defer cancel()
-
-	userID := ctx.GetString("userID")
-	ID := ctx.Param("id")
-
-	borrowing, errGet := c.usecase.GetMyBorrowingByID(contextVariable, ID, userID)
-
-	if errGet != nil {
-		helper.NewErrorResponse(ctx, errGet)
-		return
-	}
-
-	helper.NewResponseGlobal(ctx, 200, "Success Get Borrowing!", borrowing, nil, nil)
-
-}
-
 func (c *BorrowingController) GetByID(ctx *gin.Context) {
 
 	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 5*time.Second)
 	defer cancel()
 
 	ID := ctx.Param("id")
+	userID := ctx.GetString("userID")
+	isAdmin := ctx.GetBool("isAdmin")
 
-	borrowing, errGet := c.usecase.GetBorrowingByID(contextVariable, ID)
+	borrowing, errGet := c.usecase.GetBorrowingByID(contextVariable, ID, isAdmin, userID)
 
 	if errGet != nil {
 		helper.NewErrorResponse(ctx, errGet)

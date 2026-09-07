@@ -15,7 +15,6 @@ func BorrowingRouter(app *gin.Engine, borrowingController *controller.BorrowingC
 
 	borrowing.POST("", middleware.RequireRole("USER_PUBLIC"), borrowingController.Create)
 	borrowing.GET("", middleware.RequireRole("SUPER_ADMIN", "ADMIN", "USER_PUBLIC"), borrowingController.GetALL)
-	borrowing.GET("/:id/my", middleware.RequireRole("USER_PUBLIC"), borrowingController.GetMyByID)
 	borrowing.GET("/:id", middleware.RequireRole("SUPER_ADMIN", "ADMIN"), borrowingController.GetByID)
 	borrowing.PATCH("/:id/status", middleware.RequireRole("SUPER_ADMIN", "ADMIN"), borrowingController.UpdateStatus)
 

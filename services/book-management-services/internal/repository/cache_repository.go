@@ -58,6 +58,11 @@ func (repo *BookCacheRepository) GetById(ctx context.Context, ID string) (*model
 
 	if repo.rds != nil {
 		go func(data *models.Books, key string) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Println("Redis Set Panic:", r)
+				}
+			}()
 			bgContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 

@@ -25,7 +25,7 @@ func NewAuthControllerRegistry(authUsecase usecase.AuthUsecaseInterface) *AuthCo
 
 func (c *AuthController) Login(ctx *gin.Context) {
 
-	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 5*time.Second)
+	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 31*time.Second)
 	defer cancel()
 
 	request := new(dto.LoginRequest)
@@ -54,7 +54,7 @@ func (c *AuthController) Login(ctx *gin.Context) {
 
 func (c *AuthController) Register(ctx *gin.Context) {
 
-	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 10*time.Second)
+	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 31*time.Second)
 	defer cancel()
 
 	request := new(dto.RegisterUser)
@@ -117,7 +117,7 @@ func (c *AuthController) Logout(ctx *gin.Context) {
 
 func (c *AuthController) Me(ctx *gin.Context) {
 
-	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 2*time.Second)
+	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 10*time.Second)
 	defer cancel()
 
 	claims, exists := ctx.Get("claims")
