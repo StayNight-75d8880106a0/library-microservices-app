@@ -20,6 +20,9 @@ type WaitingListRepositoryInterface interface {
 	GetFirstWaitingListByBookID(ctx context.Context, bookID string) (*models.WaitingList, error)
 	CancelWaitingListByUser(ctx context.Context, ID string, userID string) (int64, error)
 	GetExpiredWaitingLists(ctx context.Context, expiredHours int) ([]models.WaitingList, error)
+	MarkFulfilledWaitingList(ctx context.Context, userID string, bookID string) (int64, error)
+	RevertFulfilledWaitingList(ctx context.Context, userID string, bookID string) error
+	CountNotifiedWaitingListsByBookID(ctx context.Context, bookID string) (int64, error)
 }
 
 type WaitingListRepository struct {
@@ -190,5 +193,35 @@ func (repo *WaitingListRepository) GetExpiredWaitingLists(ctx context.Context, e
 	errGet := repo.DB.WithContext(ctx).Table("waiting_lists").Where("status = ?", models.WaitingListStatusNotified).Where("updated_at <= ?", expirationThreshold).Find(&waitingLists).Error
 
 	return waitingLists, errGet
+
+}
+
+func (repo *WaitingListRepository) MarkFulfilledWaitingList(ctx context.Context, userID string, bookID string) (int64, error) {
+
+	result := repo.DB.WithContext(ctx).Table("waiting_lists").Where("user_id = ? AND book_id = ? AND status = ?", userID, bookID, models.WaitingListStatusNotified).Updates(map[string]interface{}{
+		"status":     models.WaitingListStatusFulfilled,
+		"updated_at": gorm.Expr("NOW()"),
+	})
+
+	return result.RowsAffected, result.Error
+}
+
+func (repo *WaitingListRepository) RevertFulfilledWaitingList(ctx context.Context, userID string, bookID string) error {
+
+	err := repo.DB.WithContext(ctx).Table("waiting_lists").Where("user_id = ? AND book_id = ? AND status = ?", userID, bookID, models.WaitingListStatusFulfilled).Updates(map[string]interface{}{"status": models.WaitingListStatusNotified,
+		"updated_at": gorm.Expr("NOW()"),
+	}).Error
+
+	return err
+
+}
+
+func (repo *WaitingListRepository) CountNotifiedWaitingListsByBookID(ctx context.Context, bookID string) (int64, error) {
+
+	var total int64
+
+	errCount := repo.DB.WithContext(ctx).Table("waiting_lists").Where("book_id = ? AND status = ?", bookID, models.WaitingListStatusNotified).Count(&total).Error
+
+	return total, errCount
 
 }

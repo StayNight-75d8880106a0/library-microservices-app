@@ -106,6 +106,24 @@ func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.Cre
 		calculateDueDate = userDueDate
 	}
 
+	claimed, errClaim := u.waitingListRepository.MarkFulfilledWaitingList(ctx, userID, *request.BookID)
+
+	if errClaim != nil {
+		return nil, helper.NewInternalServerError("An Error During Mark Fulfilled Waiting List!", helper.ErrorDetail{Detail: errClaim.Error()})
+	}
+
+	if claimed == 0 {
+		notifiedCount, errCount := u.waitingListRepository.CountNotifiedWaitingListsByBookID(ctx, *request.BookID)
+
+		if errCount != nil {
+			return nil, helper.NewInternalServerError("An Error During Count Notified Waiting Lists By Book ID!", helper.ErrorDetail{Detail: errCount.Error()})
+		}
+
+		if notifiedCount > 0 {
+			return nil, helper.NewForbiddenError("Waiting List Not Fulfilled!", helper.ErrorDetail{Detail: "You have not fulfilled your waiting list for this book. Please wait for your turn to borrow the book!"})
+		}
+	}
+
 	borrowing := &models.Borrowing{
 		UserID:     userID,
 		BookID:     *request.BookID,
@@ -117,6 +135,13 @@ func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.Cre
 	errCreate := u.repository.CreateBorrowing(ctx, borrowing)
 
 	if errCreate != nil {
+		if claimed > 0 {
+			errRevert := u.waitingListRepository.RevertFulfilledWaitingList(ctx, userID, *request.BookID)
+
+			if errRevert != nil {
+				log.Printf("[WaitingList] Gagal mengembalikan status antrean buku %s untuk user %s: %v", *request.BookID, userID, errRevert)
+			}
+		}
 		return nil, helper.NewInternalServerError("An Error Durng Create Borrowing!", helper.ErrorDetail{Detail: errCreate.Error()})
 	}
 

@@ -117,3 +117,15 @@ func (repo *WaitingListCacheRepository) CancelWaitingListByUser(ctx context.Cont
 func (repo *WaitingListCacheRepository) GetExpiredWaitingLists(ctx context.Context, expiredHours int) ([]models.WaitingList, error) {
 	return repo.base.GetExpiredWaitingLists(ctx, expiredHours)
 }
+
+func (repo *WaitingListCacheRepository) MarkFulfilledWaitingList(ctx context.Context, userID string, bookID string) (int64, error) {
+	return repo.base.MarkFulfilledWaitingList(ctx, userID, bookID)
+}
+
+func (repo *WaitingListCacheRepository) RevertFulfilledWaitingList(ctx context.Context, userID string, bookID string) error {
+	return repo.base.RevertFulfilledWaitingList(ctx, userID, bookID)
+}
+
+func (repo *WaitingListCacheRepository) CountNotifiedWaitingListsByBookID(ctx context.Context, bookID string) (int64, error) {
+	return repo.base.CountNotifiedWaitingListsByBookID(ctx, bookID)
+}
