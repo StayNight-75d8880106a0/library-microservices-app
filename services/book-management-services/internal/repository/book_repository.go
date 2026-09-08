@@ -4,6 +4,7 @@ import (
 	"book-management-services/internal/dto"
 	"book-management-services/internal/models"
 	"context"
+	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"gorm.io/gorm"
@@ -90,20 +91,31 @@ func (repo *BookRepository) Update(ctx context.Context, book *models.Books, ID s
 
 func (repo *BookRepository) UpdateAvaliableStock(ctx context.Context, ID string, quantity int, action string) error {
 
-	var errUpadate error
-
 	if action == "RETURNED" {
-		errUpadate = repo.DB.WithContext(ctx).Table("books").Where("id = ? AND available_stock >= ?", ID, quantity).Updates(map[string]interface{}{
-			"available_stock": gorm.Expr("available_stock + ?", quantity),
-			"updated_at":      gorm.Expr("NOW()"),
-		}).Error
-	} else if action == "BORROWED" {
-		errUpadate = repo.DB.WithContext(ctx).Table("books").Where("id = ? AND available_stock >= ?", ID, quantity).Updates(map[string]interface{}{
-			"available_stock": gorm.Expr("available_stock - ?", quantity),
-			"updated_at":      gorm.Expr("NOW()"),
-		}).Error
+		return repo.DB.WithContext(ctx).Table("books").
+			Where("id = ?", ID).
+			Updates(map[string]interface{}{
+				"available_stock": gorm.Expr("available_stock + ?", quantity),
+				"updated_at":      gorm.Expr("NOW()"),
+			}).Error
 	}
 
-	return errUpadate
+	if action == "BORROWED" {
+		result := repo.DB.WithContext(ctx).Table("books").
+			Where("id = ? AND available_stock >= ?", ID, quantity).
+			Updates(map[string]interface{}{
+				"available_stock": gorm.Expr("available_stock - ?", quantity),
+				"updated_at":      gorm.Expr("NOW()"),
+			})
 
+		if result.Error != nil {
+			return result.Error
+		}
+
+		if result.RowsAffected == 0 {
+			return fmt.Errorf("There is insufficient stock of the book %s to be deducted!", ID)
+		}
+	}
+
+	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"borrowing-management-services/internal/models"
 	"borrowing-management-services/internal/repository"
 	"context"
+	"log"
 	"math"
 
 	"gorm.io/gorm"
@@ -15,6 +16,8 @@ type WaitingListUsecaseInterface interface {
 	JoinWaitingList(ctx context.Context, userID string, request *dto.CreateWaitingListRequest) (*dto.WaitingListResponse, error)
 	GetAllWaitingLists(ctx context.Context, limit int, page int, role bool, userID string) ([]dto.WaitingListResponse, helper.PaginationMeta, error)
 	GetWaitingListByID(ctx context.Context, ID string, role bool, userID string) (*dto.WaitingListResponse, error)
+	ProcessExpiredWaitingLists(ctx context.Context) error
+	CancelWaitingList(ctx context.Context, ID string, userID string) error
 }
 
 type WaitingListUsecase struct {
@@ -235,5 +238,103 @@ func (u *WaitingListUsecase) GetWaitingListByID(ctx context.Context, ID string, 
 	}
 
 	return result, nil
+
+}
+
+func (u *WaitingListUsecase) CancelWaitingList(ctx context.Context, ID string, userID string) error {
+
+	waitingList, errGet := u.repository.GetWaitingListByID(ctx, ID)
+
+	if errGet != nil {
+		if errGet == gorm.ErrRecordNotFound {
+			return helper.NewNotFoundError("Waiting List Not Found!", helper.ErrorDetail{Detail: "Waiting List with the given ID does not exist!"})
+		}
+		return helper.NewInternalServerError("An Error During Get Waiting List By ID!", helper.ErrorDetail{Detail: errGet.Error()})
+	}
+
+	if waitingList.UserID != userID {
+		return helper.NewForbiddenError("Access Denied!", helper.ErrorDetail{Detail: "You do not have access to this Waiting List!"})
+	}
+
+	if waitingList.Status != models.WaitingListStatusWaiting && waitingList.Status != models.WaitingListStatusNotified {
+		return helper.NewBadRequestError("Invalid Waiting List Status!", helper.ErrorDetail{Detail: "Only waiting lists with status 'waiting' or 'notified' can be canceled!"})
+	}
+
+	previousStatus := waitingList.Status
+
+	affectedRows, errUpdate := u.repository.CancelWaitingListByUser(ctx, ID, userID)
+
+	if errUpdate != nil {
+		return helper.NewInternalServerError("An Error During Cancel Waiting List!", helper.ErrorDetail{Detail: errUpdate.Error()})
+	}
+
+	if affectedRows == 0 {
+		return helper.NewConflictError("Waiting List Already Changed!", helper.ErrorDetail{Detail: "This waiting list has already been cancelled or expired. Please refresh and try again."})
+	}
+
+	if previousStatus == models.WaitingListStatusNotified {
+		go func(bookID string) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[PANIC] processNextWaitingUser: %v", r)
+				}
+			}()
+
+			if err := u.processNextWaitingUser(context.Background(), bookID); err != nil {
+				log.Printf("[WaitingList] Gagal promosi antrean buku %s: %v", bookID, err)
+			}
+		}(waitingList.BookID)
+	}
+
+	return nil
+
+}
+
+func (u *WaitingListUsecase) processNextWaitingUser(ctx context.Context, bookID string) error {
+
+	nextWaitingList, errGet := u.repository.GetFirstWaitingListByBookID(ctx, bookID)
+
+	if errGet != nil {
+		if errGet == gorm.ErrRecordNotFound {
+			return nil
+		}
+		return helper.NewInternalServerError("An Error During Get Next Waiting List!", helper.ErrorDetail{Detail: errGet.Error()})
+	}
+
+	_, errUpdate := u.repository.UpdateStatusWaitingList(ctx, nextWaitingList.ID, models.WaitingListStatusWaiting, models.WaitingListStatusNotified)
+
+	if errUpdate != nil {
+		return helper.NewInternalServerError("An Error During Update Status Waiting List!", helper.ErrorDetail{Detail: errUpdate.Error()})
+	}
+
+	return nil
+
+}
+
+func (u *WaitingListUsecase) ProcessExpiredWaitingLists(ctx context.Context) error {
+
+	expiredList, errGet := u.repository.GetExpiredWaitingLists(ctx, 12)
+
+	if errGet != nil {
+		return helper.NewInternalServerError("An Error During Get Expired Waiting Lists!", helper.ErrorDetail{Detail: errGet.Error()})
+	}
+
+	for _, value := range expiredList {
+
+		rowsAffected, errUpdate := u.repository.UpdateStatusWaitingList(ctx, value.ID, models.WaitingListStatusNotified, models.WaitingListStatusExpired)
+
+		if errUpdate != nil {
+			log.Printf("[CRON] Gagal expired %s: %v", value.ID, errUpdate)
+			continue
+		}
+
+		if rowsAffected == 0 {
+			continue
+		}
+
+		u.processNextWaitingUser(ctx, value.BookID)
+	}
+
+	return nil
 
 }

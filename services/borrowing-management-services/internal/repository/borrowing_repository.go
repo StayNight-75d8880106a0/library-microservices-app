@@ -81,12 +81,17 @@ func (repo *BorrowingUserRepository) GetBorrowingByID(ctx context.Context, ID st
 
 func (repo *BorrowingUserRepository) UpdateStatus(ctx context.Context, ID string, status models.BorrowingStatus) error {
 
-	errUpdate := repo.db.WithContext(ctx).Table("borrowings").Where("id = ?", ID).Updates(map[string]interface{}{
+	updateFields := map[string]interface{}{
 		"status":      status,
-		"returned_at": gorm.Expr("NOW()"),
 		"updated_at":  gorm.Expr("NOW()"),
-	}).Error
+		"returned_at": nil,
+	}
+
+	if status == models.BorrowingStatusReturned {
+		updateFields["returned_at"] = gorm.Expr("NOW()")
+	}
+
+	errUpdate := repo.db.WithContext(ctx).Table("borrowings").Where("id = ?", ID).Updates(updateFields).Error
 
 	return errUpdate
-
 }

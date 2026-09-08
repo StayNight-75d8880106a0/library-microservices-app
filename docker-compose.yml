@@ -261,7 +261,9 @@ services:
     restart: unless-stopped
     ports:
       - "${borrowingManagement_MYSQL_PORT_EXPOSE}:${MYSQL_PORT_GLOBAL}"
+    command: --default-time-zone=+00:00
     environment:
+      TZ: UTC
       MYSQL_USER: ${borrowingManagement_MYSQL_USER}
       MYSQL_ROOT_PASSWORD: ${borrowingManagement_MYSQL_ROOT_PASSWORD}
       MYSQL_PASSWORD: ${borrowingManagement_MYSQL_PASSWORD}

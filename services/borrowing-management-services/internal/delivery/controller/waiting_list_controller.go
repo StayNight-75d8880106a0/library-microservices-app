@@ -88,3 +88,22 @@ func (c *WaitingListController) GetByID(ctx *gin.Context) {
 	helper.NewResponseGlobal(ctx, 200, "Success Get Detail Waiting Lists", waitingList, nil, nil)
 
 }
+
+func (c *WaitingListController) Cancel(ctx *gin.Context) {
+
+	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	ID := ctx.Param("id")
+	userID := ctx.GetString("userID")
+
+	errUpdate := c.usecase.CancelWaitingList(contextVariable, ID, userID)
+
+	if errUpdate != nil {
+		helper.NewErrorResponse(ctx, errUpdate)
+		return
+	}
+
+	helper.NewResponseGlobal(ctx, 200, "Success Cancel Waiting List", nil, nil, nil)
+
+}

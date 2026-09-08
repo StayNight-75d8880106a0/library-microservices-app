@@ -16,7 +16,7 @@ func ConnectMySQL() error {
 
 	config := config.NewMySQLConfig()
 
-	dsn := fmt.Sprintf(`%s:%s@tcp(%s:%s)/%s?charset=%s&parseTime=True&loc=Local`,
+	dsn := fmt.Sprintf(`%s:%s@tcp(%s:%s)/%s?charset=%s&parseTime=True&loc=UTC`,
 		config.User, config.Password, config.Host, config.Port, config.Database, config.Charset)
 
 	ConnectDatabase, ErrorConnect := gorm.Open(mysql.Open(dsn), &gorm.Config{

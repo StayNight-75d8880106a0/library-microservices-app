@@ -82,9 +82,9 @@ func (repo *WaitingListCacheRepository) GetWaitingListByID(ctx context.Context, 
 	return waitingList, nil
 }
 
-func (repo *WaitingListCacheRepository) UpdateStatusWaitingList(ctx context.Context, ID string, status models.WaitingListStatus) (int64, error) {
+func (repo *WaitingListCacheRepository) UpdateStatusWaitingList(ctx context.Context, ID string, from models.WaitingListStatus, to models.WaitingListStatus) (int64, error) {
 
-	rowsAffected, err := repo.base.UpdateStatusWaitingList(ctx, ID, status)
+	rowsAffected, err := repo.base.UpdateStatusWaitingList(ctx, ID, from, to)
 
 	if err == nil && repo.rds != nil {
 		cacheKey := "waitinglist:" + ID
@@ -112,4 +112,8 @@ func (repo *WaitingListCacheRepository) CancelWaitingListByUser(ctx context.Cont
 	}
 
 	return rowsAffected, err
+}
+
+func (repo *WaitingListCacheRepository) GetExpiredWaitingLists(ctx context.Context, expiredHours int) ([]models.WaitingList, error) {
+	return repo.base.GetExpiredWaitingLists(ctx, expiredHours)
 }

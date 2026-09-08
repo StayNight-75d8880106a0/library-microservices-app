@@ -314,7 +314,17 @@ func (u *BorrowingUsecase) UpdateBorrowingStatus(ctx context.Context, ID string,
 			CreatedAt: time.Now(),
 		}
 
-		go u.processNextWaitingUser(context.Background(), borrowing.BookID)
+		go func(bookID string) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[PANIC] processNextWaitingUser: %v", r)
+				}
+			}()
+
+			if err := u.processNextWaitingUser(context.Background(), bookID); err != nil {
+				log.Printf("[WaitingList] Gagal promosi antrean buku %s: %v", bookID, err)
+			}
+		}(borrowing.BookID)
 	} else if statusEnum == models.BorrowingStatusBorrowing {
 		borrowingEvent = &event.BorrowingCreatedEvent{
 			BookID:    borrowing.BookID,
@@ -350,7 +360,7 @@ func (u *BorrowingUsecase) processNextWaitingUser(ctx context.Context, bookID st
 			return helper.NewInternalServerError("An Error During Get First Waiting List By Book ID!", helper.ErrorDetail{Detail: errGet.Error()})
 		}
 
-		rowsAffected, errUpdate := u.waitingListRepository.UpdateStatusWaitingList(ctx, nextUser.ID, models.WaitingListStatusNotified)
+		rowsAffected, errUpdate := u.waitingListRepository.UpdateStatusWaitingList(ctx, nextUser.ID, models.WaitingListStatusWaiting, models.WaitingListStatusNotified)
 
 		if errUpdate != nil {
 			return helper.NewInternalServerError("An Error During Update Waiting List Status!", helper.ErrorDetail{Detail: errUpdate.Error()})

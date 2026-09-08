@@ -4,6 +4,7 @@ import (
 	"borrowing-management-services/internal/models"
 	"context"
 	"errors"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
@@ -14,10 +15,11 @@ type WaitingListRepositoryInterface interface {
 	GetALLWaitingList(ctx context.Context, limit int, offset int) ([]models.WaitingList, int64, error)
 	GetALLMyWaitingList(ctx context.Context, limit int, offset int, userID string) ([]models.WaitingList, int64, error)
 	GetWaitingListByID(ctx context.Context, ID string) (*models.WaitingList, error)
-	UpdateStatusWaitingList(ctx context.Context, ID string, status models.WaitingListStatus) (int64, error)
+	UpdateStatusWaitingList(ctx context.Context, ID string, from models.WaitingListStatus, to models.WaitingListStatus) (int64, error)
 	// GetLastQueueNumber(ctx context.Context, bookID string) (int, error)
 	GetFirstWaitingListByBookID(ctx context.Context, bookID string) (*models.WaitingList, error)
 	CancelWaitingListByUser(ctx context.Context, ID string, userID string) (int64, error)
+	GetExpiredWaitingLists(ctx context.Context, expiredHours int) ([]models.WaitingList, error)
 }
 
 type WaitingListRepository struct {
@@ -117,17 +119,16 @@ func (repo *WaitingListRepository) GetWaitingListByID(ctx context.Context, ID st
 
 }
 
-func (repo *WaitingListRepository) UpdateStatusWaitingList(ctx context.Context, ID string, status models.WaitingListStatus) (int64, error) {
+func (repo *WaitingListRepository) UpdateStatusWaitingList(ctx context.Context, ID string, from models.WaitingListStatus, to models.WaitingListStatus) (int64, error) {
 
 	result := repo.DB.WithContext(ctx).Table("waiting_lists").
-		Where("id = ? AND status = ?", ID, models.WaitingListStatusWaiting).
+		Where("id = ? AND status = ?", ID, from).
 		Updates(map[string]interface{}{
-			"status":     status,
+			"status":     to,
 			"updated_at": gorm.Expr("NOW()"),
 		})
 
 	return result.RowsAffected, result.Error
-
 }
 
 // func (repo *WaitingListRepository) GetLastQueueNumber(ctx context.Context, bookID string) (int, error) {
@@ -170,12 +171,24 @@ func isRetryableMySQLError(err error) bool {
 func (repo *WaitingListRepository) CancelWaitingListByUser(ctx context.Context, ID string, userID string) (int64, error) {
 
 	result := repo.DB.WithContext(ctx).Table("waiting_lists").
-		Where("id = ? AND user_id = ? AND status = ?", ID, userID, models.WaitingListStatusWaiting).
+		Where("id = ? AND user_id = ? AND status IN ?", ID, userID, []models.WaitingListStatus{models.WaitingListStatusWaiting, models.WaitingListStatusNotified}).
 		Updates(map[string]interface{}{
 			"status":     models.WaitingListStatusCancelled,
 			"updated_at": gorm.Expr("NOW()"),
 		})
 
 	return result.RowsAffected, result.Error
+
+}
+
+func (repo *WaitingListRepository) GetExpiredWaitingLists(ctx context.Context, expiredHours int) ([]models.WaitingList, error) {
+
+	var waitingLists []models.WaitingList
+
+	expirationThreshold := time.Now().UTC().Add(-time.Duration(expiredHours) * time.Hour)
+
+	errGet := repo.DB.WithContext(ctx).Table("waiting_lists").Where("status = ?", models.WaitingListStatusNotified).Where("updated_at <= ?", expirationThreshold).Find(&waitingLists).Error
+
+	return waitingLists, errGet
 
 }

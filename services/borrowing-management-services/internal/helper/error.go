@@ -90,3 +90,12 @@ func NewNotFoundError(message string, details ErrorDetail) *AppError {
 		Detail:       details,
 	}
 }
+
+func NewConflictError(message string, details ErrorDetail) *AppError {
+	return &AppError{
+		Code:         http.StatusConflict,
+		ErrorCode:    "CONFLICT",
+		ErrorMessage: message,
+		Detail:       details,
+	}
+}

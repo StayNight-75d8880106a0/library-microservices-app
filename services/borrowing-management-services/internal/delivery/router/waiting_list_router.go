@@ -16,5 +16,6 @@ func WaitingListRouter(app *gin.Engine, borrowingController *controller.WaitingL
 	waiting.POST("", middleware.RequireRole("USER_PUBLIC"), borrowingController.Create)
 	waiting.GET("", middleware.RequireRole("USER_PUBLIC", "SUPER_ADMIN", "ADMIN"), borrowingController.GetAll)
 	waiting.GET("/:id", middleware.RequireRole("SUPER_ADMIN", "ADMIN"), borrowingController.GetByID)
+	waiting.PATCH("/:id/cancel", middleware.RequireRole("USER_PUBLIC"), borrowingController.Cancel)
 
 }

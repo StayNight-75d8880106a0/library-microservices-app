@@ -13,7 +13,7 @@ const (
 	WaitingListStatusWaiting   WaitingListStatus = "WAITING"
 	WaitingListStatusNotified  WaitingListStatus = "NOTIFIED"
 	WaitingListStatusCancelled WaitingListStatus = "CANCELLED"
-	WaitingListStatusFulFilled WaitingListStatus = "FULFILLED"
+	WaitingListStatusExpired   WaitingListStatus = "EXPIRED"
 )
 
 type WaitingList struct {
@@ -29,7 +29,7 @@ type WaitingList struct {
 	AvgWaitMin     float64           `gorm:"type:decimal(10,4);not null" json:"avg_wait_min"`  // Wq (menit)
 	OptimalServers *int              `gorm:"type:int;null" json:"optimal_servers"`             // c*
 	QueueNumber    int               `gorm:"type:int;not null" json:"queue_number"`
-	Status         WaitingListStatus `gorm:"type:enum('WAITING', 'NOTIFIED', 'CANCELLED', 'FULFILLED');not null;default:'WAITING'" json:"status"`
+	Status         WaitingListStatus `gorm:"type:enum('WAITING', 'NOTIFIED', 'CANCELLED', 'EXPIRED');not null;default:'WAITING'" json:"status"`
 	CreatedAt      time.Time         `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt      time.Time         `gorm:"autoUpdateTime" json:"updated_at"`
 }

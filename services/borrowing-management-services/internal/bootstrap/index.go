@@ -10,10 +10,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/gin-gonic/gin"
+	"github.com/robfig/cron/v3"
 )
 
 func InitApp() {
@@ -22,8 +26,8 @@ func InitApp() {
 
 	appConfig := config.NewAppConfig()
 
-	ctx, cancelConsumer := context.WithCancel(context.Background())
-	defer cancelConsumer()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	errConnectMysql := database.ConnectMySQL()
 
@@ -47,7 +51,14 @@ func InitApp() {
 
 	app := gin.Default()
 
-	modules := initregistry.NewInitRegistry(redisdb.RDS, appConfig, database.DB)
+	jakartaLoc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		log.Fatalf("Failed to load timezone: %v", err)
+	}
+
+	scheduler := cron.New(cron.WithSeconds(), cron.WithLocation(jakartaLoc))
+
+	modules := initregistry.NewInitRegistry(redisdb.RDS, appConfig, database.DB, scheduler)
 	initrouter.InitRouter(app, modules, jwks, appConfig)
 
 	go modules.KafkaCacheRegistry.AuthConsumer.StartConsuming(
@@ -59,6 +70,9 @@ func InitApp() {
 		ctx,
 		modules.KafkaCacheRegistry.EventHandler.HandleUserStatusUpdateEvent,
 	)
+
+	cronScheduler := modules.WaitingListRegistry.WaitingListCronJob
+	cronScheduler.Start()
 
 	srv := &http.Server{Addr: ":" + appConfig.PortConfig.PORT, Handler: app}
 
@@ -73,6 +87,10 @@ func InitApp() {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	if err := modules.WaitingListRegistry.WaitingListCronJob.Stop(shutdownCtx); err != nil {
+		log.Printf("Cron shutdown error: %v", err)
+	}
 
 	srv.Shutdown(shutdownCtx)
 	modules.KafkaCacheRegistry.AuthConsumer.Close()
