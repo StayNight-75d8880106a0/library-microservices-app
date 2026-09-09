@@ -41,3 +41,7 @@ type KeycloakTokenResponse struct {
 	RefreshExpiresIn float64 `json:"refresh_expires_in"`
 	TokenType        string  `json:"token_type"`
 }
+
+type ResendEmailRequest struct {
+	Email *string `json:"email" binding:"required"`
+}

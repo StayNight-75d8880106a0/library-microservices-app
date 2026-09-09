@@ -54,24 +54,51 @@ func NewRedisConfig() *RedisConfig {
 }
 
 type KafkaConfig struct {
-	Brokers                []string
-	TopicUserCreated       string
-	TopicUserAuthenticated string
+	Brokers                      []string
+	TopicUserCreated             string
+	TopicUserAuthenticated       string
+	TopicResendVerificationEmail string
 }
 
 func NewKafkaConfig() *KafkaConfig {
 	return &KafkaConfig{
-		Brokers:                []string{os.Getenv("KAFKA_BROKERS")},
-		TopicUserCreated:       os.Getenv("KAFKA_TOPIC_USER_CREATED"),
-		TopicUserAuthenticated: os.Getenv("KAFKA_TOPIC_USER_LOGIN"),
+		Brokers:                      []string{os.Getenv("KAFKA_BROKERS")},
+		TopicUserCreated:             os.Getenv("KAFKA_TOPIC_USER_CREATED"),
+		TopicUserAuthenticated:       os.Getenv("KAFKA_TOPIC_USER_LOGIN"),
+		TopicResendVerificationEmail: os.Getenv("KAFKA_TOPIC_RESEND_VERIFICATION_EMAIL"),
+	}
+}
+
+type BaseURLConfig struct {
+	BaseURL string
+}
+
+func NewBaseURLConfig() *BaseURLConfig {
+	return &BaseURLConfig{
+		BaseURL: os.Getenv("BASE_URL"),
+	}
+}
+
+type JWTConfig struct {
+	JWTSecret string
+	JWTExpiry int
+}
+
+func NewJWTConfig() *JWTConfig {
+	jwtExpiry, _ := strconv.Atoi(os.Getenv("JWT_EXPIRATION"))
+	return &JWTConfig{
+		JWTSecret: os.Getenv("JWT_SECRET"),
+		JWTExpiry: jwtExpiry,
 	}
 }
 
 type AppConfig struct {
-	Port     *PortConfig
-	Keycloak *KeycloakConfig
-	Redis    *RedisConfig
-	Kafka    *KafkaConfig
+	Port      *PortConfig
+	Keycloak  *KeycloakConfig
+	Redis     *RedisConfig
+	Kafka     *KafkaConfig
+	BaseURL   *BaseURLConfig
+	JwtConfig *JWTConfig
 }
 
 func NewAppConfig() *AppConfig {
@@ -84,9 +111,11 @@ func NewAppConfig() *AppConfig {
 	}
 
 	return &AppConfig{
-		Port:     NewPortConfig(),
-		Keycloak: NewKeycloakConfig(),
-		Redis:    NewRedisConfig(),
-		Kafka:    NewKafkaConfig(),
+		Port:      NewPortConfig(),
+		Keycloak:  NewKeycloakConfig(),
+		Redis:     NewRedisConfig(),
+		Kafka:     NewKafkaConfig(),
+		BaseURL:   NewBaseURLConfig(),
+		JwtConfig: NewJWTConfig(),
 	}
 }

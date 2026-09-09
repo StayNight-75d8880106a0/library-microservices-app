@@ -21,5 +21,7 @@ func AuthRouter(app *gin.Engine, authController *controller.AuthController, deps
 	auth.POST("/logout", authMiddleware, authController.Logout)
 	auth.GET("/me", authMiddleware, authController.Me)
 	auth.POST("/refresh", authController.RefreshToken)
+	auth.POST("/resend-email", authController.ResendVerificationEmail)
+	auth.GET("/verify-email", authController.VerifyEmail)
 
 }

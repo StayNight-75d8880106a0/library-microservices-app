@@ -20,6 +20,8 @@ type KeycloakClientInterface interface {
 	RegisterUser(ctx context.Context, adminToken string, payload map[string]interface{}) (string, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*dto.LoginResponse, error)
 	Logout(ctx context.Context, refreshToken string) error
+	GetUserByEmail(ctx context.Context, adminToken string, email string) (map[string]interface{}, error)
+	MarkEmailVerified(ctx context.Context, adminToken string, userID string) error
 }
 
 type KeycloakClient struct {
@@ -59,8 +61,30 @@ func (kc *KeycloakClient) Login(ctx context.Context, username string, password s
 
 	defer response.Body.Close()
 
+	bodyBytes, errRead := io.ReadAll(response.Body)
+
+	if errRead != nil {
+		return nil, helper.NewInternalServerError("An Error During Read Response Body From Keycloak", helper.ErrorDetail{Detail: errRead.Error()})
+	}
+
 	if response.StatusCode != http.StatusOK {
-		return nil, helper.NewUnauthorizedError("Username or password is incorrect!", helper.ErrorDetail{Detail: "Invalid credentials from keycloak!"})
+		var errBody struct {
+			Error            string `json:"error"`
+			ErrorDescription string `json:"error_description"`
+		}
+
+		json.Unmarshal(bodyBytes, &errBody)
+
+		switch errBody.ErrorDescription {
+		case "Account is not fully set up":
+			return nil, helper.NewUnauthorizedError("Your email address has not yet been verified!", helper.ErrorDetail{Detail: "Please check your email inbox and click on the activation link!"})
+		case "Account disabled":
+			return nil, helper.NewUnauthorizedError("Your account has been disabled!", helper.ErrorDetail{Detail: "Please contact the administrator for assistance!"})
+		case "Account temporarily disabled":
+			return nil, helper.NewUnauthorizedError("Your account has been temporarily disabled!", helper.ErrorDetail{Detail: "Please contact the administrator for assistance!"})
+		default:
+			return nil, helper.NewUnauthorizedError("Invalid username or password!", helper.ErrorDetail{Detail: errBody.ErrorDescription})
+		}
 	}
 
 	var result map[string]interface{}
@@ -243,6 +267,72 @@ func (kc *KeycloakClient) Logout(ctx context.Context, refreshToken string) error
 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return helper.NewUnauthorizedError("Failed to revoke session on Keycloak!", helper.ErrorDetail{Detail: "Refresh token might be invalid or already revoked!"})
+	}
+
+	return nil
+
+}
+
+func (kc *KeycloakClient) GetUserByEmail(ctx context.Context, adminToken string, email string) (map[string]interface{}, error) {
+
+	endpoint := fmt.Sprintf("%s/admin/realms/%s/users?email=%s&exact=true", kc.cfg.KeycloakURL, kc.cfg.Realm, url.QueryEscape(email))
+
+	request, errRequest := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+
+	if errRequest != nil {
+		return nil, helper.NewInternalServerError("Failed to create get user by email request to keycloak!", helper.ErrorDetail{Detail: errRequest.Error()})
+	}
+
+	request.Header.Set("Authorization", "Bearer "+adminToken)
+
+	response, errResponse := http.DefaultClient.Do(request)
+
+	if errResponse != nil {
+		return nil, helper.NewInternalServerError("Failed to send get user by email request to keycloak!", helper.ErrorDetail{Detail: errResponse.Error()})
+	}
+
+	defer response.Body.Close()
+
+	var users []map[string]interface{}
+
+	json.NewDecoder(response.Body).Decode(&users)
+
+	if len(users) == 0 {
+		return nil, helper.NewNotFoundError("User not found!", helper.ErrorDetail{Detail: "No account registered with this email"})
+	}
+
+	return users[0], nil
+
+}
+
+func (kc *KeycloakClient) MarkEmailVerified(ctx context.Context, adminToken string, userID string) error {
+
+	endpoint := fmt.Sprintf("%s/admin/realms/%s/users/%s", kc.cfg.KeycloakURL, kc.cfg.Realm, userID)
+
+	payload := map[string]interface{}{
+		"emailVerified":   true,
+		"requiredActions": []string{},
+	}
+
+	jsonData, errJson := json.Marshal(payload)
+
+	if errJson != nil {
+		return helper.NewInternalServerError("Failed to marshal payload for marking email as verified!", helper.ErrorDetail{Detail: errJson.Error()})
+	}
+
+	request, errRequest := http.NewRequestWithContext(ctx, "PUT", endpoint, bytes.NewBuffer(jsonData))
+
+	if errRequest != nil {
+		return helper.NewInternalServerError("Failed to create request to mark email as verified!", helper.ErrorDetail{Detail: errRequest.Error()})
+	}
+
+	request.Header.Set("Authorization", "Bearer "+adminToken)
+	request.Header.Set("Content-Type", "application/json")
+
+	response, errResponse := http.DefaultClient.Do(request)
+
+	if errResponse != nil || (response.StatusCode != http.StatusOK && response.StatusCode != http.StatusNoContent) {
+		return helper.NewInternalServerError("Failed to verify user email in Keycloak", helper.ErrorDetail{})
 	}
 
 	return nil

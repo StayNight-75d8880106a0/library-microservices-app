@@ -175,3 +175,59 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) {
 
 	helper.NewResponseGlobal(ctx, 200, "Success Refresh Token!", refresh, nil, nil)
 }
+
+func (c *AuthController) VerifyEmail(ctx *gin.Context) {
+
+	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	token := ctx.Query("token")
+
+	if token == "" {
+		helper.NewErrorResponse(ctx, helper.NewBadRequestError("Token is required!", helper.ErrorDetail{Detail: "Token query parameter is missing!"}))
+		return
+	}
+
+	errVerify := c.usecase.VerifyEmail(contextVariable, token)
+
+	if errVerify != nil {
+		if errors.Is(contextVariable.Err(), context.DeadlineExceeded) {
+			helper.NewErrorResponse(ctx, helper.NewStatusGatewayTimeoutError("Request timeout, upstream service took too long!", helper.ErrorDetail{Detail: contextVariable.Err().Error()}))
+			return
+		}
+		helper.NewErrorResponse(ctx, errVerify)
+		return
+	}
+
+	helper.NewResponseGlobal(ctx, 200, "Success Verify Email!", nil, nil, nil)
+
+}
+
+func (c *AuthController) ResendVerificationEmail(ctx *gin.Context) {
+
+	contextVariable, cancel := context.WithTimeout(ctx.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	request := new(dto.ResendEmailRequest)
+
+	errRequest := ctx.ShouldBindJSON(request)
+
+	if errRequest != nil {
+		helper.NewErrorResponse(ctx, errRequest)
+		return
+	}
+
+	errResend := c.usecase.ResendVerificationEmail(contextVariable, request)
+
+	if errResend != nil {
+		if errors.Is(contextVariable.Err(), context.DeadlineExceeded) {
+			helper.NewErrorResponse(ctx, helper.NewStatusGatewayTimeoutError("Request timeout, upstream service took too long!", helper.ErrorDetail{Detail: contextVariable.Err().Error()}))
+			return
+		}
+		helper.NewErrorResponse(ctx, errResend)
+		return
+	}
+
+	helper.NewResponseGlobal(ctx, 200, "Success Resend Verification Email!", nil, nil, nil)
+
+}

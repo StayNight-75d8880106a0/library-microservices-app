@@ -9,6 +9,7 @@ import (
 	"auth-services/internal/infrastructure/keycloak"
 	"auth-services/internal/repository"
 	"context"
+	"fmt"
 	"log"
 	"time"
 )
@@ -19,6 +20,8 @@ type AuthUsecaseInterface interface {
 	Logout(ctx context.Context, token string, request *dto.RefreshTokenRequest, userID string) error
 	Me(ctx context.Context, claims map[string]interface{}) (*dto.MeResponse, error)
 	RefreshToken(ctx context.Context, request *dto.RefreshTokenRequest) (*dto.LoginResponse, error)
+	VerifyEmail(ctx context.Context, token string) error
+	ResendVerificationEmail(ctx context.Context, request *dto.ResendEmailRequest) error
 }
 
 type AuthUsecase struct {
@@ -117,11 +120,15 @@ func (u *AuthUsecase) RegisterUser(ctx context.Context, request *dto.RegisterUse
 	}
 
 	payload := map[string]interface{}{
-		"username":  *request.Username,
-		"email":     *request.Email,
-		"firstName": *request.FirstName,
-		"lastName":  *request.LastName,
-		"enabled":   true,
+		"username":      *request.Username,
+		"email":         *request.Email,
+		"firstName":     *request.FirstName,
+		"lastName":      *request.LastName,
+		"enabled":       true,
+		"emailVerified": false,
+		"requiredActions": []string{
+			"VERIFY_EMAIL",
+		},
 		"attributes": map[string][]string{
 			"nik": {*request.NIK},
 		},
@@ -140,11 +147,20 @@ func (u *AuthUsecase) RegisterUser(ctx context.Context, request *dto.RegisterUse
 		return errCreate
 	}
 
+	generateVerificationLink, errGenerate := helper.GenerateVerificationLink(u.cfg.BaseURL.BaseURL, keycloakUserID, u.cfg.JwtConfig.JWTSecret, u.cfg.JwtConfig.JWTExpiry)
+
+	if errGenerate != nil {
+		return helper.NewInternalServerError("An Error During Generate Verification Link", helper.ErrorDetail{Detail: errGenerate.Error()})
+	}
+
 	event := &event.UserCreatedEvent{
-		KeycloakID: keycloakUserID,
-		FirstName:  *request.FirstName,
-		LastName:   *request.LastName,
-		CreatedAt:  time.Now(),
+		EventID:          fmt.Sprintf("USER_CREATED-%s", keycloakUserID),
+		KeycloakID:       keycloakUserID,
+		FirstName:        *request.FirstName,
+		LastName:         *request.LastName,
+		Email:            *request.Email,
+		VerificationLink: generateVerificationLink,
+		CreatedAt:        time.Now(),
 	}
 
 	go func() {
@@ -237,4 +253,80 @@ func (u *AuthUsecase) RefreshToken(ctx context.Context, request *dto.RefreshToke
 	}
 
 	return result, nil
+}
+
+func (u *AuthUsecase) VerifyEmail(ctx context.Context, token string) error {
+
+	claims, errExtract := helper.ParseVerificationToken(token, u.cfg.JwtConfig.JWTSecret)
+
+	if errExtract != nil {
+		return helper.NewUnauthorizedError("Invalid Verification Token", helper.ErrorDetail{Detail: errExtract.Error()})
+	}
+
+	keycloakUserID := claims["sub"].(string)
+
+	adminToken, errAdminToken := u.keycloak.GetAdminToken(ctx)
+
+	if errAdminToken != nil {
+		return errAdminToken
+	}
+
+	errUpdate := u.keycloak.MarkEmailVerified(ctx, adminToken, keycloakUserID)
+
+	if errUpdate != nil {
+		return helper.NewInternalServerError("Failed to mark email as verified", helper.ErrorDetail{Detail: errUpdate.Error()})
+	}
+
+	return nil
+
+}
+
+func (u *AuthUsecase) ResendVerificationEmail(ctx context.Context, request *dto.ResendEmailRequest) error {
+
+	if request.Email == nil || *request.Email == "" {
+		return helper.NewUnprocessableEntityError("Email Cannot Be Empty!", helper.ErrorDetail{Detail: "Email is required!"})
+	}
+
+	adminToken, errAdminToken := u.keycloak.GetAdminToken(ctx)
+
+	if errAdminToken != nil {
+		return errAdminToken
+	}
+
+	user, errGetUser := u.keycloak.GetUserByEmail(ctx, adminToken, *request.Email)
+	if errGetUser != nil {
+		return errGetUser
+	}
+
+	if emailVerified, ok := user["emailVerified"].(bool); ok && emailVerified {
+		return helper.NewBadRequestError("Email already verified!", helper.ErrorDetail{Detail: "This account has already been activated"})
+	}
+
+	keycloakUserID := user["id"].(string)
+	firstName, _ := user["firstName"].(string)
+
+	generateVerificationLink, errGenerate := helper.GenerateVerificationLink(u.cfg.BaseURL.BaseURL, keycloakUserID, u.cfg.JwtConfig.JWTSecret, u.cfg.JwtConfig.JWTExpiry)
+
+	if errGenerate != nil {
+		return helper.NewInternalServerError("An Error During Generate Verification Link", helper.ErrorDetail{Detail: errGenerate.Error()})
+	}
+
+	resendEvent := &event.VerificationEmailRequestedEvent{
+		EventID:          fmt.Sprintf("RESEND_EMAIL-%s-%d", keycloakUserID, time.Now().Unix()),
+		KeycloakID:       keycloakUserID,
+		FirstName:        firstName,
+		Email:            *request.Email,
+		VerificationLink: generateVerificationLink,
+		CreatedAt:        time.Now(),
+	}
+
+	go func() {
+		errPublish := u.kafkaProducer.PublishUserCreatedEvent(context.Background(), resendEvent, keycloakUserID, u.cfg.Kafka.TopicResendVerificationEmail)
+		if errPublish != nil {
+			log.Printf("[Kafka Publish Error] Failed to send event for user %s: %v", keycloakUserID, errPublish)
+		}
+	}()
+
+	return nil
+
 }

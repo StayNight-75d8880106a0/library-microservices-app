@@ -48,8 +48,10 @@ type UserResponse struct {
 }
 
 type UserCreatedKafkaPayloadConsumer struct {
-	KeycloakID string    `json:"keycloakId"`
-	FirstName  string    `json:"firstName"`
-	LastName   string    `json:"lastName"`
-	CreatedAt  time.Time `json:"createdAt"`
+	KeycloakID       string    `json:"keycloakId"`
+	FirstName        string    `json:"firstName"`
+	LastName         string    `json:"lastName"`
+	Email            string    `json:"email"`
+	VerificationLink string    `json:"verificationLink"`
+	CreatedAt        time.Time `json:"createdAt"`
 }
