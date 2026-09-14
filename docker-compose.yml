@@ -302,6 +302,79 @@ services:
         condition: service_healthy
     networks:
       - app_network
+  
+  mailserver:
+    image: mailserver/docker-mailserver:16.0.1
+    container_name: docker-mailserver
+    restart: unless-stopped
+    hostname: ${MAILSERVER_HOST}
+    domainname: ${MAILSERVER_DOMAIN}
+    ports:
+      - "${STMP_PORT_EXPOSE}:25"
+      - "${SUBMISSION_PORT_EXPOSE}:587"
+    volumes:
+      - maildata:/var/mail
+      - maillog:/var/log/mail
+      - mailstate:/var/mail-state
+      - ./docker-data/dms/config/:/tmp/docker-mailserver/
+    environment:
+      - ENABLE_SPAMASSASSIN=0
+      - ENABLE_CLAMAV=0
+      - ENABLE_FAIL2BAN=0
+      - ONE_DIR=1
+      - DMS_TELEMETRY=0
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "dms-healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  notification-db:
+    image: postgres:15
+    container_name: notification-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${notificationService_POSTGRES_NAME}
+      POSTGRES_USER: ${notificationService_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${notificationService_POSTGRES_PASSWORD}
+    ports:
+      - "${notificationService_POSTGRES_PORT_EXPOSE}:${DB_PORT_GLOBAL}"
+    volumes:
+      - db_data_notification:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${notificationService_POSTGRES_USER} -d ${notificationService_POSTGRES_NAME}"]
+      interval: 11s
+      timeout: 6s
+      retries: 7
+
+  notification-service:
+    build: 
+      context: ./services/notification-services
+      dockerfile: Dockerfile
+    image: notification-service:latest
+    container_name: notification-service
+    restart: unless-stopped
+    ports:
+      - ${NOTIFICATION_SERVICE_PORT}:${NOTIFICATION_SERVICE_PORT}
+    env_file:
+      - .env.shared
+      - ./services/notification-services/.env.docker
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      notification-db:
+        condition: service_healthy
+      mailserver:
+        condition: service_healthy
+    networks:
+      - app_network
 
 volumes:
   keycloak_data:
@@ -315,6 +388,14 @@ volumes:
   es_data:
     driver: local
   borrowing_management_data:
+    driver: local
+  db_data_notification:
+    driver: local
+  maildata:
+    driver: local
+  maillog:
+    driver: local
+  mailstate:
     driver: local
 
 networks:
