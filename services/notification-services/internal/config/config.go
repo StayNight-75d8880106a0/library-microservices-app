@@ -94,8 +94,24 @@ type KafkaConfig struct {
 func NewKafkaConfig() *KafkaConfig {
 	return &KafkaConfig{
 		Brokers:          []string{os.Getenv("KAFKA_BROKERS")},
-		GroupID:          os.Getenv("KAFKA_CONSUMER_GROUP_BOOK_MANAGEMENT"),
+		GroupID:          os.Getenv("KAFKA_CONSUMER_GROUP_NOTIFICATION_SERVICE"),
 		TopicUserCreated: os.Getenv("KAFKA_TOPIC_USER_CREATED"),
+	}
+}
+
+type SMTPConfig struct {
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUser     string
+	SMTPPassword string
+}
+
+func NewSMTPConfig() *SMTPConfig {
+	return &SMTPConfig{
+		SMTPHost:     os.Getenv("SMTP_HOST"),
+		SMTPPort:     os.Getenv("SMTP_PORT"),
+		SMTPUser:     os.Getenv("SMTP_USER"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
 	}
 }
 
@@ -105,6 +121,7 @@ type AppConfig struct {
 	RedisConfig    *RedisConfig
 	Keycloak       *KeycloakConfig
 	KafkaConfig    *KafkaConfig
+	SMTPConfig     *SMTPConfig
 }
 
 func NewAppConfig() *AppConfig {
@@ -122,5 +139,6 @@ func NewAppConfig() *AppConfig {
 		RedisConfig:    NewRedisConfig(),
 		Keycloak:       NewKeycloakConfig(),
 		KafkaConfig:    NewKafkaConfig(),
+		SMTPConfig:     NewSMTPConfig(),
 	}
 }

@@ -63,6 +63,12 @@ func (kc *KeycloakClient) Login(ctx context.Context, username string, password s
 
 	bodyBytes, errRead := io.ReadAll(response.Body)
 
+	var result map[string]interface{}
+
+	if errDecode := json.Unmarshal(bodyBytes, &result); errDecode != nil {
+		return nil, helper.NewInternalServerError("An Error During Decode Login Response From Keycloak", helper.ErrorDetail{Detail: errDecode.Error()})
+	}
+
 	if errRead != nil {
 		return nil, helper.NewInternalServerError("An Error During Read Response Body From Keycloak", helper.ErrorDetail{Detail: errRead.Error()})
 	}
@@ -86,8 +92,6 @@ func (kc *KeycloakClient) Login(ctx context.Context, username string, password s
 			return nil, helper.NewUnauthorizedError("Invalid username or password!", helper.ErrorDetail{Detail: errBody.ErrorDescription})
 		}
 	}
-
-	var result map[string]interface{}
 
 	json.NewDecoder(response.Body).Decode(&result)
 

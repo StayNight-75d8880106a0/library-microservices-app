@@ -24,7 +24,7 @@ func GenerateVerificationLink(baseURL string, KeycloakID string, secretKey strin
 		return "", errToken
 	}
 
-	verificationLink := fmt.Sprintf("%s/v1/auth/verify-email?token=%s", baseURL, signedToken)
+	verificationLink := fmt.Sprintf("%s/api/v1/auth/verify-email?token=%s", baseURL, signedToken)
 
 	return verificationLink, nil
 

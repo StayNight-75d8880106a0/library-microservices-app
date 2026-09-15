@@ -6,8 +6,11 @@ import (
 	"log"
 	"net/http"
 	"notification-services/internal/config"
+	"notification-services/internal/delivery/router/initrouter"
 	"notification-services/internal/infrastructure/database"
 	redisdb "notification-services/internal/infrastructure/redis"
+	"notification-services/internal/registry/initregistry"
+	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/gin-gonic/gin"
@@ -36,13 +39,19 @@ func InitApp() {
 
 	jwksURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/certs", appConfig.Keycloak.KeycloakURL, appConfig.Keycloak.Realm)
 
-	_, err := keyfunc.NewDefault([]string{jwksURL})
+	jwks, err := keyfunc.NewDefault([]string{jwksURL})
 
 	if err != nil {
 		log.Fatalf("Failed to fetch JWKS from Keycloak: %v", err)
 	}
 
 	app := gin.Default()
+
+	modules := initregistry.NewInitRegistry(database.DB, redisdb.RDS, appConfig)
+	initrouter.InitRouter(app, modules, jwks, appConfig)
+
+	modules.EmailLog.EmailLogConsumer.StartConsuming(ctx)
+	defer modules.EmailLog.EmailLogConsumer.Close()
 
 	srv := &http.Server{Addr: ":" + appConfig.PortConfig.PORT, Handler: app}
 
@@ -55,4 +64,9 @@ func InitApp() {
 	<-ctx.Done()
 	log.Println("Shutting down...")
 
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	srv.Shutdown(shutdownCtx)
+	modules.EmailLog.EmailLogConsumer.Close()
 }
