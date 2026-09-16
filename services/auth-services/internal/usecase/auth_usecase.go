@@ -304,6 +304,7 @@ func (u *AuthUsecase) ResendVerificationEmail(ctx context.Context, request *dto.
 
 	keycloakUserID := user["id"].(string)
 	firstName, _ := user["firstName"].(string)
+	lastName, _ := user["lastName"].(string)
 
 	generateVerificationLink, errGenerate := helper.GenerateVerificationLink(u.cfg.BaseURL.BaseURL, keycloakUserID, u.cfg.JwtConfig.JWTSecret, u.cfg.JwtConfig.JWTExpiry)
 
@@ -315,6 +316,7 @@ func (u *AuthUsecase) ResendVerificationEmail(ctx context.Context, request *dto.
 		EventID:          fmt.Sprintf("RESEND_EMAIL-%s-%d", keycloakUserID, time.Now().Unix()),
 		KeycloakID:       keycloakUserID,
 		FirstName:        firstName,
+		LastName:         lastName,
 		Email:            *request.Email,
 		VerificationLink: generateVerificationLink,
 		CreatedAt:        time.Now(),

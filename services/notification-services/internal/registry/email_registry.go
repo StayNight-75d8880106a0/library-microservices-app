@@ -13,8 +13,9 @@ import (
 )
 
 type EmailModule struct {
-	EmailLogController *controller.EmailController
-	EmailLogConsumer   *consumer.KafkaConsumer
+	EmailLogController  *controller.EmailController
+	EmailLogConsumer    *consumer.KafkaConsumer
+	ResendEmailConsumer *consumer.KafkaConsumer
 }
 
 func NewEmailLogModuleRegistry(db *gorm.DB, rds *redis.Client, cfg *config.AppConfig) *EmailModule {
@@ -25,13 +26,16 @@ func NewEmailLogModuleRegistry(db *gorm.DB, rds *redis.Client, cfg *config.AppCo
 
 	usecase := usecase.NewEmailUsecase(cacheRepository, cfg.SMTPConfig)
 
-	kafkaConsumer := consumer.NewKafkaConsumer(cfg.KafkaConfig.Brokers, cfg.KafkaConfig.TopicUserCreated, cfg.KafkaConfig.GroupID, usecase)
+	kafkaConsumerEmail := consumer.NewKafkaConsumer(cfg.KafkaConfig.Brokers, cfg.KafkaConfig.TopicUserCreated, cfg.KafkaConfig.GroupID, usecase)
+
+	kafkaConsumerEmailResend := consumer.NewKafkaConsumer(cfg.KafkaConfig.Brokers, cfg.KafkaConfig.TopicResendEmail, cfg.KafkaConfig.GroupIDResend, usecase)
 
 	controller := controller.NewEmailController(usecase)
 
 	return &EmailModule{
-		EmailLogController: controller,
-		EmailLogConsumer:   kafkaConsumer,
+		EmailLogController:  controller,
+		EmailLogConsumer:    kafkaConsumerEmail,
+		ResendEmailConsumer: kafkaConsumerEmailResend,
 	}
 
 }

@@ -88,14 +88,18 @@ func NewKeycloakConfig() *KeycloakConfig {
 type KafkaConfig struct {
 	Brokers          []string
 	GroupID          string
+	GroupIDResend    string
 	TopicUserCreated string
+	TopicResendEmail string
 }
 
 func NewKafkaConfig() *KafkaConfig {
 	return &KafkaConfig{
 		Brokers:          []string{os.Getenv("KAFKA_BROKERS")},
 		GroupID:          os.Getenv("KAFKA_CONSUMER_GROUP_NOTIFICATION_SERVICE"),
+		GroupIDResend:    os.Getenv("KAFKA_CONSUMER_GROUP_NOTIFICATION_SERVICE_RESEND"),
 		TopicUserCreated: os.Getenv("KAFKA_TOPIC_USER_CREATED"),
+		TopicResendEmail: os.Getenv("KAFKA_TOPIC_RESEND_VERIFICATION_EMAIL"),
 	}
 }
 

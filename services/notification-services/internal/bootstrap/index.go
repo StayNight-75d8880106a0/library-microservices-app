@@ -53,6 +53,9 @@ func InitApp() {
 	modules.EmailLog.EmailLogConsumer.StartConsuming(ctx)
 	defer modules.EmailLog.EmailLogConsumer.Close()
 
+	modules.EmailLog.ResendEmailConsumer.StartConsuming(ctx)
+	defer modules.EmailLog.ResendEmailConsumer.Close()
+
 	srv := &http.Server{Addr: ":" + appConfig.PortConfig.PORT, Handler: app}
 
 	go func() {
@@ -69,4 +72,5 @@ func InitApp() {
 
 	srv.Shutdown(shutdownCtx)
 	modules.EmailLog.EmailLogConsumer.Close()
+	modules.EmailLog.ResendEmailConsumer.Close()
 }

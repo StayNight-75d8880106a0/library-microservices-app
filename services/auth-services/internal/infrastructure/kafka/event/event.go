@@ -23,6 +23,7 @@ type VerificationEmailRequestedEvent struct {
 	KeycloakID       string    `json:"keycloakId"`
 	Email            string    `json:"email"`
 	FirstName        string    `json:"firstName"`
+	LastName         string    `json:"lastName"`
 	VerificationLink string    `json:"verificationLink"`
 	CreatedAt        time.Time `json:"createdAt"`
 }
