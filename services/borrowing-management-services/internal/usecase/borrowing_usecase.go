@@ -142,6 +142,11 @@ func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.Cre
 				log.Printf("[WaitingList] Gagal mengembalikan status antrean buku %s untuk user %s: %v", *request.BookID, userID, errRevert)
 			}
 		}
+
+		if helper.IsDuplicateEntryError(errCreate, "uq_active_borrowing") {
+			return nil, helper.NewConflictError("Active Borrowing Already Exists!", helper.ErrorDetail{Detail: "You already have an active borrowing for this book. Please return the book before borrowing it again!"})
+		}
+
 		return nil, helper.NewInternalServerError("An Error Durng Create Borrowing!", helper.ErrorDetail{Detail: errCreate.Error()})
 	}
 
@@ -323,6 +328,10 @@ func (u *BorrowingUsecase) UpdateBorrowingStatus(ctx context.Context, ID string,
 		return helper.NewInternalServerError("An Error During Get Borrowing By ID!", helper.ErrorDetail{Detail: errGet.Error()})
 	}
 
+	if borrowing.Status == statusEnum {
+		return helper.NewUnprocessableEntityError("Status Already Set!", helper.ErrorDetail{Detail: "The borrowing status is already set to the requested status!"})
+	}
+
 	errUpdate := u.repository.UpdateStatus(ctx, ID, statusEnum)
 
 	if errUpdate != nil {
@@ -359,12 +368,14 @@ func (u *BorrowingUsecase) UpdateBorrowingStatus(ctx context.Context, ID string,
 		}
 	}
 
-	go func() {
-		errPublish := u.kafkaProducer.PublishBorrowingCreatedEvent(context.Background(), borrowingEvent, ID, u.cfg.Kafka.TopicBorrowingCreated)
-		if errPublish != nil {
-			log.Printf("[Kafka Publish Error] Failed to send event for bookID in borrowing service %s: %v", ID, errPublish)
-		}
-	}()
+	if borrowingEvent != nil {
+		go func(event *event.BorrowingCreatedEvent) {
+			errPublish := u.kafkaProducer.PublishBorrowingCreatedEvent(context.Background(), event, ID, u.cfg.Kafka.TopicBorrowingCreated)
+			if errPublish != nil {
+				log.Printf("[Kafka Publish Error] Failed to send event for bookID in borrowing service %s: %v", ID, errPublish)
+			}
+		}(borrowingEvent)
+	}
 
 	return nil
 

@@ -61,6 +61,9 @@ func (u *WaitingListUsecase) JoinWaitingList(ctx context.Context, userID string,
 	errCreate := u.repository.Create(ctx, waitingTerm)
 
 	if errCreate != nil {
+		if helper.IsDuplicateEntryError(errCreate, "uq_active_waiting_list") {
+			return nil, helper.NewConflictError("Active Waiting List Already Exists!", helper.ErrorDetail{Detail: "You already have an active waiting list for this book. Please wait for your turn or cancel the existing waiting list!"})
+		}
 		return nil, helper.NewInternalServerError("Failed to create waiting list", helper.ErrorDetail{Detail: errCreate.Error()})
 	}
 

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"borrowing-management-services/internal/helper"
 	"borrowing-management-services/internal/models"
 	"context"
 	"errors"
@@ -162,8 +163,9 @@ func isRetryableMySQLError(err error) bool {
 	}
 
 	switch mysqlErr.Number {
-	case 1062, // Duplicate entry (uq_book_queue)
-		1213, // Deadlock found
+	case 1062: // Duplicate entry — hanya retry kalau nomor antrean yang bentrok
+		return helper.IsDuplicateEntryError(err, "uq_book_queue")
+	case 1213, // Deadlock found
 		1205: // Lock wait timeout exceeded
 		return true
 	}
