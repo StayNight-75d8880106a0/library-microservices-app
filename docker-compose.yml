@@ -385,6 +385,48 @@ services:
     networks:
       - app_network
 
+  logbook-db:
+    image: postgres:15
+    container_name: logbook-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${logbookService_POSTGRES_NAME}
+      POSTGRES_USER: ${logbookService_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${logbookService_POSTGRES_PASSWORD}
+    ports:
+      - "${logbookService_POSTGRES_PORT_EXPOSE}:${DB_PORT_GLOBAL}"
+    volumes:
+      - db_data_logbook:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${logbookService_POSTGRES_USER} -d ${logbookService_POSTGRES_NAME}"]
+      interval: 11s
+      timeout: 6s
+      retries: 7
+
+  logbook-service:
+    build: 
+      context: ./services/activity-logbook-services
+      dockerfile: Dockerfile
+    image: logbook-service:latest
+    container_name: logbook-service
+    restart: unless-stopped
+    ports:
+      - ${LOGBOOK_SERVICE_PORT}:${LOGBOOK_SERVICE_PORT}
+    env_file:
+      - .env.shared
+      - ./services/activity-logbook-services/.env.docker
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      logbook-db:
+        condition: service_healthy
+    networks:
+      - app_network
+
 volumes:
   keycloak_data:
     driver: local
@@ -408,6 +450,9 @@ volumes:
     driver: local
   notification_service_data:
     driver: local
+  db_data_logbook:
+    driver: local
+
 
 networks:
   app_network:

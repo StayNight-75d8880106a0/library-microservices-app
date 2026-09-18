@@ -1,9 +1,9 @@
 package redisdb
 
 import (
+	"activity-logbook-services/internal/config"
 	"context"
 	"log"
-	"notification-services/internal/config"
 	"runtime"
 	"time"
 
@@ -29,7 +29,7 @@ func ConnectRedis(ctx context.Context) error {
 		MaxRetries:      2,
 		MinRetryBackoff: 11 * time.Millisecond,
 		MaxRetryBackoff: 101 * time.Millisecond,
-		ClientName:      "notification-management-service",
+		ClientName:      "activity-logbook-service",
 	})
 
 	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
