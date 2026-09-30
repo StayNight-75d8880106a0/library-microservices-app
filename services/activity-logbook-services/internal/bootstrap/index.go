@@ -2,8 +2,10 @@ package bootstrap
 
 import (
 	"activity-logbook-services/internal/config"
+	"activity-logbook-services/internal/delivery/router/initrouter"
 	"activity-logbook-services/internal/infrastructure/database"
 	redisdb "activity-logbook-services/internal/infrastructure/redis"
+	"activity-logbook-services/internal/registry/initregistry"
 	"context"
 	"fmt"
 	"log"
@@ -37,13 +39,16 @@ func InitApp() {
 
 	jwksURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/certs", appConfig.Keycloak.KeycloakURL, appConfig.Keycloak.Realm)
 
-	_, err := keyfunc.NewDefault([]string{jwksURL})
+	jwks, err := keyfunc.NewDefault([]string{jwksURL})
 
 	if err != nil {
 		log.Fatalf("Failed to fetch JWKS from Keycloak: %v", err)
 	}
 
 	app := gin.Default()
+
+	modules := initregistry.NewInitRegistry(database.DB, redisdb.RDS, appConfig)
+	initrouter.Initrouter(app, modules, jwks, appConfig)
 
 	srv := &http.Server{Addr: ":" + appConfig.PortConfig.PORT, Handler: app}
 
