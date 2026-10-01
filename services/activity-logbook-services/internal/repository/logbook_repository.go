@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type LogbookRepositoryInterface interface {
@@ -27,7 +28,10 @@ func NewLogbookRepository(db *gorm.DB) *LogbookRepository {
 
 func (repo *LogbookRepository) Create(ctx context.Context, logbook *models.Logbook) error {
 
-	errCreate := repo.DB.WithContext(ctx).Table("logbook_audits").Create(&logbook).Error
+	errCreate := repo.DB.WithContext(ctx).Table("logbook_audits").Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "event_id"}, {Name: "occurred_at"}},
+		DoNothing: true,
+	}).Create(&logbook).Error
 
 	return errCreate
 

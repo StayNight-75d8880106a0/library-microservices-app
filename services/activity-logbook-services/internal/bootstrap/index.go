@@ -50,6 +50,9 @@ func InitApp() {
 	modules := initregistry.NewInitRegistry(database.DB, redisdb.RDS, appConfig)
 	initrouter.Initrouter(app, modules, jwks, appConfig)
 
+	modules.Logbook.LogbookConsumer.StartConsuming(ctx)
+	defer modules.Logbook.LogbookConsumer.Close()
+
 	srv := &http.Server{Addr: ":" + appConfig.PortConfig.PORT, Handler: app}
 
 	go func() {
@@ -65,5 +68,5 @@ func InitApp() {
 	defer cancel()
 
 	srv.Shutdown(shutdownCtx)
-
+	modules.Logbook.LogbookConsumer.Close()
 }

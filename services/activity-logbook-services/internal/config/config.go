@@ -88,12 +88,14 @@ func NewRedisConfig() *RedisConfig {
 type KafkaConfig struct {
 	Brokers []string
 	GroupID string
+	Topic   string
 }
 
 func NewKafkaConfig() *KafkaConfig {
 	return &KafkaConfig{
 		Brokers: []string{os.Getenv("KAFKA_BROKERS")},
 		GroupID: os.Getenv("KAFKA_CONSUMER_GROUP_LOGBOOK_SERVICE"),
+		Topic:   os.Getenv("KAFKA_TOPIC_LOGBOOK_CREATED"),
 	}
 }
 

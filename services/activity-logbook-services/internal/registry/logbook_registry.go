@@ -3,6 +3,7 @@ package registry
 import (
 	"activity-logbook-services/internal/config"
 	"activity-logbook-services/internal/delivery/controller"
+	"activity-logbook-services/internal/infrastructure/kafka/consumer"
 	"activity-logbook-services/internal/repository"
 	"activity-logbook-services/internal/usecase"
 
@@ -12,6 +13,7 @@ import (
 
 type LogbookModule struct {
 	LogbookController *controller.LogbookController
+	LogbookConsumer   *consumer.KafkaConsumer
 }
 
 func NewLogbookModuleRegistry(db *gorm.DB, rds *redis.Client, cfg *config.AppConfig) *LogbookModule {
@@ -22,10 +24,13 @@ func NewLogbookModuleRegistry(db *gorm.DB, rds *redis.Client, cfg *config.AppCon
 
 	logbookUsecase := usecase.NewLogbookUsecase(logbookCacheRepository)
 
+	logbookConsumer := consumer.NewKafkaConsumer(cfg.KafkaConfig.Brokers, cfg.KafkaConfig.Topic, cfg.KafkaConfig.GroupID, logbookUsecase)
+
 	logbookController := controller.NewLogbookController(logbookUsecase)
 
 	return &LogbookModule{
 		LogbookController: logbookController,
+		LogbookConsumer:   logbookConsumer,
 	}
 
 }

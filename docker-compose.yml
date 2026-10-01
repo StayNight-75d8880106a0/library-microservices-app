@@ -386,7 +386,7 @@ services:
       - app_network
 
   logbook-db:
-    image: postgres:15
+    image: timescale/timescaledb:2.28.3-pg15
     container_name: logbook-db
     restart: unless-stopped
     environment:

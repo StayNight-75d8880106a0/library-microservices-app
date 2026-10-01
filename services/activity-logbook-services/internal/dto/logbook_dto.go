@@ -6,7 +6,6 @@ import (
 )
 
 type LogbookRequest struct {
-	ID              *string         `json:"ID"`
 	EventID         *string         `json:"eventID"`
 	TraceID         *string         `json:"traceID"`
 	UserID          *string         `json:"userID"`
