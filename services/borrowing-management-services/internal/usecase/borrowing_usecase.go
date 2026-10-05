@@ -139,7 +139,7 @@ func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.Cre
 			errRevert := u.waitingListRepository.RevertFulfilledWaitingList(ctx, userID, *request.BookID)
 
 			if errRevert != nil {
-				log.Printf("[WaitingList] Gagal mengembalikan status antrean buku %s untuk user %s: %v", *request.BookID, userID, errRevert)
+				log.Printf("[WaitingList] Failed to restore the queue status of book %s for user %s: %v", *request.BookID, userID, errRevert)
 			}
 		}
 
@@ -356,7 +356,7 @@ func (u *BorrowingUsecase) UpdateBorrowingStatus(ctx context.Context, ID string,
 			}()
 
 			if err := u.processNextWaitingUser(context.Background(), bookID); err != nil {
-				log.Printf("[WaitingList] Gagal promosi antrean buku %s: %v", bookID, err)
+				log.Printf("[WaitingList] Failed promotion of the book queue %s: %v", bookID, err)
 			}
 		}(borrowing.BookID)
 	} else if statusEnum == models.BorrowingStatusBorrowing {
@@ -370,7 +370,7 @@ func (u *BorrowingUsecase) UpdateBorrowingStatus(ctx context.Context, ID string,
 
 	if borrowingEvent != nil {
 		go func(event *event.BorrowingCreatedEvent) {
-			errPublish := u.kafkaProducer.PublishBorrowingCreatedEvent(context.Background(), event, ID, u.cfg.Kafka.TopicBorrowingCreated)
+			errPublish := u.kafkaProducer.PublishEvent(context.Background(), event, ID, u.cfg.Kafka.TopicBorrowingCreated)
 			if errPublish != nil {
 				log.Printf("[Kafka Publish Error] Failed to send event for bookID in borrowing service %s: %v", ID, errPublish)
 			}
@@ -406,7 +406,7 @@ func (u *BorrowingUsecase) processNextWaitingUser(ctx context.Context, bookID st
 			return nil
 		}
 
-		log.Printf("[WaitingList] Kandidat %s sudah diambil proses lain, lanjut ke antrean berikutnya", nextUser.ID)
+		log.Printf("[WaitingList] Candidate %s has already been selected by another process, proceed to the next queue", nextUser.ID)
 	}
 
 	return nil

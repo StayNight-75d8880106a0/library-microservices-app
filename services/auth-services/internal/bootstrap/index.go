@@ -2,7 +2,9 @@ package bootstrap
 
 import (
 	"auth-services/internal/config"
+	"auth-services/internal/delivery/middleware"
 	"auth-services/internal/delivery/router/initrouter"
+	"auth-services/internal/infrastructure/kafka/producer"
 	redisdb "auth-services/internal/infrastructure/redis"
 	"auth-services/internal/registry/initregistry"
 	"context"
@@ -37,6 +39,9 @@ func InitApp() {
 
 	app := gin.Default()
 
+	auditProducer := producer.NewKafkaProducer(appConfig.Kafka.Brokers)
+	app.Use(middleware.AuditMiddleware(auditProducer, appConfig, "auth-service"))
+
 	modules := initregistry.NewInitRegistry(appConfig, redisdb.RDS)
 	initrouter.InitRouter(app, modules, jwks, appConfig)
 
@@ -58,4 +63,5 @@ func InitApp() {
 	defer cancel()
 
 	srv.Shutdown(shutdownCtx)
+	auditProducer.Close()
 }

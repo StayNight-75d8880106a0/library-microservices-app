@@ -58,6 +58,7 @@ type KafkaConfig struct {
 	TopicUserCreated             string
 	TopicUserAuthenticated       string
 	TopicResendVerificationEmail string
+	TopicAuditLog                string
 }
 
 func NewKafkaConfig() *KafkaConfig {
@@ -66,6 +67,7 @@ func NewKafkaConfig() *KafkaConfig {
 		TopicUserCreated:             os.Getenv("KAFKA_TOPIC_USER_CREATED"),
 		TopicUserAuthenticated:       os.Getenv("KAFKA_TOPIC_USER_LOGIN"),
 		TopicResendVerificationEmail: os.Getenv("KAFKA_TOPIC_RESEND_VERIFICATION_EMAIL"),
+		TopicAuditLog:                os.Getenv("KAFKA_TOPIC_LOGBOOK_CREATED"),
 	}
 }
 

@@ -2,9 +2,11 @@ package bootstrap
 
 import (
 	"book-management-services/internal/config"
+	"book-management-services/internal/delivery/middleware"
 	"book-management-services/internal/delivery/router/initrouter"
 	mysql "book-management-services/internal/infrastructure/database"
 	"book-management-services/internal/infrastructure/elasticsearch"
+	"book-management-services/internal/infrastructure/kafka/producer"
 	redisdb "book-management-services/internal/infrastructure/redis"
 	"book-management-services/internal/registry/initialregistry"
 	"context"
@@ -53,6 +55,9 @@ func InitApp() {
 
 	app := gin.Default()
 
+	auditProducer := producer.NewKafkaProducer(appConfig.KafkaConfig.Brokers)
+	app.Use(middleware.AuditMiddleware(auditProducer, appConfig, "book-management-service"))
+
 	modules := initialregistry.NewInitRegistry(mysql.DB, redisdb.RDS, elasticsearch.ElasticseearchClient, appConfig)
 	initrouter.InitRouter(app, modules, jwks, appConfig)
 
@@ -74,5 +79,6 @@ func InitApp() {
 	defer cancel()
 
 	srv.Shutdown(shutdownCtx)
+	auditProducer.Close()
 	modules.Book.BookConsumer.Close()
 }

@@ -6,8 +6,10 @@ import (
 	"log"
 	"net/http"
 	"notification-services/internal/config"
+	"notification-services/internal/delivery/middleware"
 	"notification-services/internal/delivery/router/initrouter"
 	"notification-services/internal/infrastructure/database"
+	"notification-services/internal/infrastructure/kafka/producer"
 	redisdb "notification-services/internal/infrastructure/redis"
 	"notification-services/internal/registry/initregistry"
 	"time"
@@ -47,6 +49,9 @@ func InitApp() {
 
 	app := gin.Default()
 
+	auditProducer := producer.NewKafkaProducer(appConfig.KafkaConfig.Brokers)
+	app.Use(middleware.AuditMiddleware(auditProducer, appConfig, "notification-service"))
+
 	modules := initregistry.NewInitRegistry(database.DB, redisdb.RDS, appConfig)
 	initrouter.InitRouter(app, modules, jwks, appConfig)
 
@@ -71,6 +76,7 @@ func InitApp() {
 	defer cancel()
 
 	srv.Shutdown(shutdownCtx)
+	auditProducer.Close()
 	modules.EmailLog.EmailLogConsumer.Close()
 	modules.EmailLog.ResendEmailConsumer.Close()
 }

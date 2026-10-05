@@ -91,6 +91,7 @@ type KafkaConfig struct {
 	GroupIDResend    string
 	TopicUserCreated string
 	TopicResendEmail string
+	TopicAuditLog    string
 }
 
 func NewKafkaConfig() *KafkaConfig {
@@ -100,6 +101,7 @@ func NewKafkaConfig() *KafkaConfig {
 		GroupIDResend:    os.Getenv("KAFKA_CONSUMER_GROUP_NOTIFICATION_SERVICE_RESEND"),
 		TopicUserCreated: os.Getenv("KAFKA_TOPIC_USER_CREATED"),
 		TopicResendEmail: os.Getenv("KAFKA_TOPIC_RESEND_VERIFICATION_EMAIL"),
+		TopicAuditLog:    os.Getenv("KAFKA_TOPIC_LOGBOOK_CREATED"),
 	}
 }
 

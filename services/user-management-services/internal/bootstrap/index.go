@@ -9,7 +9,9 @@ import (
 	"user-management-services/internal/config"
 	"user-management-services/internal/database"
 	"user-management-services/internal/delivery/grpc"
+	"user-management-services/internal/delivery/middleware"
 	"user-management-services/internal/delivery/router/initrouter"
+	"user-management-services/internal/infrastructure/kafka/producer"
 	"user-management-services/internal/registry/initregistry"
 
 	"github.com/MicahParks/keyfunc/v3"
@@ -41,6 +43,9 @@ func InitApp() {
 
 	app := gin.Default()
 
+	auditProducer := producer.NewKafkaProducer(appConfig.Kafka.Brokers)
+	app.Use(middleware.AuditMiddleware(auditProducer, appConfig, "user-management-service"))
+
 	modules := initregistry.NewInitRegistry(appConfig, database.DB)
 	initrouter.InitRouter(app, modules, jwks, appConfig)
 
@@ -70,5 +75,6 @@ func InitApp() {
 	defer cancel()
 
 	srv.Shutdown(shutdownCtx)
+	auditProducer.Close()
 	modules.User.UserConsumer.Close()
 }

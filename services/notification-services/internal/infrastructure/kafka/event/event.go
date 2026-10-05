@@ -5,14 +5,7 @@ import (
 	"time"
 )
 
-type UserUpdatedEvent struct {
-	EventType string    `json:"eventType"`
-	UserID    string    `json:"userID"`
-	Status    string    `json:"status"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-type UserAuditLogEvent struct {
+type NotificationAuditLogEvent struct {
 	EventID         *string         `json:"eventID"`
 	TraceID         *string         `json:"traceID"`
 	UserID          *string         `json:"userID"`

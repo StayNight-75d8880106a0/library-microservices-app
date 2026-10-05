@@ -48,6 +48,15 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
+	userID, errExtract := helper.ExtractUserIDFromTokenForLogin(login.AccessToken)
+
+	ctx.Set("user_id", userID)
+
+	if errExtract != nil {
+		helper.NewErrorResponse(ctx, helper.NewUnauthorizedError("Unauthorized!", helper.ErrorDetail{Detail: "Failed to extract user ID from access token!"}))
+		return
+	}
+
 	helper.NewResponseGlobal(ctx, 200, "Success Login!", login, nil, nil)
 
 }
@@ -170,6 +179,15 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) {
 			return
 		}
 		helper.NewErrorResponse(ctx, err)
+		return
+	}
+
+	userID, errExtract := helper.ExtractUserIDFromTokenForLogin(refresh.AccessToken)
+
+	ctx.Set("user_id", userID)
+
+	if errExtract != nil {
+		helper.NewErrorResponse(ctx, helper.NewUnauthorizedError("Unauthorized!", helper.ErrorDetail{Detail: "Failed to extract user ID from access token!"}))
 		return
 	}
 

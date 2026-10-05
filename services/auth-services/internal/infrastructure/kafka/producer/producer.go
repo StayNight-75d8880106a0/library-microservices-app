@@ -23,7 +23,7 @@ func NewKafkaProducer(brokers []string) *KafkaProducer {
 	}
 }
 
-func (kp *KafkaProducer) PublishUserCreatedEvent(ctx context.Context, event interface{}, key string, topic string) error {
+func (kp *KafkaProducer) PublishEvent(ctx context.Context, event interface{}, key string, topic string) error {
 
 	payload, errPayload := json.Marshal(event)
 

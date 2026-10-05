@@ -284,7 +284,7 @@ func (u *WaitingListUsecase) CancelWaitingList(ctx context.Context, ID string, u
 			}()
 
 			if err := u.processNextWaitingUser(context.Background(), bookID); err != nil {
-				log.Printf("[WaitingList] Gagal promosi antrean buku %s: %v", bookID, err)
+				log.Printf("[WaitingList] Failed promotion of the book queue %s: %v", bookID, err)
 			}
 		}(waitingList.BookID)
 	}
@@ -327,7 +327,7 @@ func (u *WaitingListUsecase) ProcessExpiredWaitingLists(ctx context.Context) err
 		rowsAffected, errUpdate := u.repository.UpdateStatusWaitingList(ctx, value.ID, models.WaitingListStatusNotified, models.WaitingListStatusExpired)
 
 		if errUpdate != nil {
-			log.Printf("[CRON] Gagal expired %s: %v", value.ID, errUpdate)
+			log.Printf("[CRON] Cron job failed due to expiry %s: %v", value.ID, errUpdate)
 			continue
 		}
 

@@ -77,7 +77,7 @@ func (u *AuthUsecase) Login(ctx context.Context, request *dto.LoginRequest) (*dt
 	}
 
 	go func() {
-		errPublish := u.kafkaProducer.PublishUserCreatedEvent(context.Background(), event, keycloakUserID, u.cfg.Kafka.TopicUserAuthenticated)
+		errPublish := u.kafkaProducer.PublishEvent(context.Background(), event, keycloakUserID, u.cfg.Kafka.TopicUserAuthenticated)
 		if errPublish != nil {
 			log.Printf("[Kafka Publish Error] Failed to send event for user %s: %v", keycloakUserID, errPublish)
 		}
@@ -164,7 +164,7 @@ func (u *AuthUsecase) RegisterUser(ctx context.Context, request *dto.RegisterUse
 	}
 
 	go func() {
-		errPublish := u.kafkaProducer.PublishUserCreatedEvent(context.Background(), event, keycloakUserID, u.cfg.Kafka.TopicUserCreated)
+		errPublish := u.kafkaProducer.PublishEvent(context.Background(), event, keycloakUserID, u.cfg.Kafka.TopicUserCreated)
 		if errPublish != nil {
 			log.Printf("[Kafka Publish Error] Failed to send event for user %s: %v", keycloakUserID, errPublish)
 		}
@@ -202,7 +202,7 @@ func (u *AuthUsecase) Logout(ctx context.Context, token string, request *dto.Ref
 	}
 
 	go func() {
-		errPublish := u.kafkaProducer.PublishUserCreatedEvent(context.Background(), event, userID, u.cfg.Kafka.TopicUserAuthenticated)
+		errPublish := u.kafkaProducer.PublishEvent(context.Background(), event, userID, u.cfg.Kafka.TopicUserAuthenticated)
 		if errPublish != nil {
 			log.Printf("[Kafka Publish Error] Failed to send event for user %s: %v", userID, errPublish)
 		}
@@ -323,7 +323,7 @@ func (u *AuthUsecase) ResendVerificationEmail(ctx context.Context, request *dto.
 	}
 
 	go func() {
-		errPublish := u.kafkaProducer.PublishUserCreatedEvent(context.Background(), resendEvent, keycloakUserID, u.cfg.Kafka.TopicResendVerificationEmail)
+		errPublish := u.kafkaProducer.PublishEvent(context.Background(), resendEvent, keycloakUserID, u.cfg.Kafka.TopicResendVerificationEmail)
 		if errPublish != nil {
 			log.Printf("[Kafka Publish Error] Failed to send event for user %s: %v", keycloakUserID, errPublish)
 		}

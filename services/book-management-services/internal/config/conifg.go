@@ -111,13 +111,17 @@ type KafkaConfig struct {
 	TopicUserAuthenticated string
 	TopicUserStatusUpdated string
 	TopicBorrowingCreated  string
+	TopicAuditLog          string
 }
 
 func NewKafkaConfig() *KafkaConfig {
 	return &KafkaConfig{
-		Brokers:               []string{os.Getenv("KAFKA_BROKERS")},
-		GroupID:               os.Getenv("KAFKA_CONSUMER_GROUP_BOOK_MANAGEMENT"),
-		TopicBorrowingCreated: os.Getenv("KAFKA_TOPIC_BBORROWING_CREATED"),
+		Brokers:                []string{os.Getenv("KAFKA_BROKERS")},
+		GroupID:                os.Getenv("KAFKA_CONSUMER_GROUP_BOOK_MANAGEMENT"),
+		TopicBorrowingCreated:  os.Getenv("KAFKA_TOPIC_BBORROWING_CREATED"),
+		TopicAuditLog:          os.Getenv("KAFKA_TOPIC_LOGBOOK_CREATED"),
+		TopicUserAuthenticated: os.Getenv("KAFKA_TOPIC_USER_LOGIN"),
+		TopicUserStatusUpdated: os.Getenv("KAFKA_TOPIC_USER_UPDATED"),
 	}
 }
 

@@ -61,6 +61,7 @@ type KafkaConfig struct {
 	Brokers          []string
 	TopicUserCreated string
 	TopicUserUpdated string
+	TopicAuditLog    string
 	GroupID          string
 }
 
@@ -69,6 +70,7 @@ func NewKafkaConfig() *KafkaConfig {
 		Brokers:          []string{os.Getenv("KAFKA_BROKERS")},
 		TopicUserCreated: os.Getenv("KAFKA_TOPIC_USER_CREATED"),
 		TopicUserUpdated: os.Getenv("KAFKA_TOPIC_USER_UPDATED"),
+		TopicAuditLog:    os.Getenv("KAFKA_TOPIC_LOGBOOK_CREATED"),
 		GroupID:          os.Getenv("KAFKA_CONSUMER_GROUP_USER_MANAGEMENT"),
 	}
 }

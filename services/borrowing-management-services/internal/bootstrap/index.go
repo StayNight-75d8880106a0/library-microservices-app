@@ -2,8 +2,10 @@ package bootstrap
 
 import (
 	"borrowing-management-services/internal/config"
+	"borrowing-management-services/internal/delivery/middleware"
 	"borrowing-management-services/internal/delivery/router/initrouter"
 	"borrowing-management-services/internal/infrastructure/database"
+	"borrowing-management-services/internal/infrastructure/kafka/producer"
 	redisdb "borrowing-management-services/internal/infrastructure/redis"
 	"borrowing-management-services/internal/registry/initregistry"
 	"context"
@@ -51,6 +53,9 @@ func InitApp() {
 
 	app := gin.Default()
 
+	auditProducer := producer.NewKafkaProducer(appConfig.Kafka.Brokers)
+	app.Use(middleware.AuditMiddleware(auditProducer, appConfig, "borrowing-management-service"))
+
 	jakartaLoc, err := time.LoadLocation("Asia/Jakarta")
 	if err != nil {
 		log.Fatalf("Failed to load timezone: %v", err)
@@ -93,6 +98,7 @@ func InitApp() {
 	}
 
 	srv.Shutdown(shutdownCtx)
+	auditProducer.Close()
 	modules.KafkaCacheRegistry.AuthConsumer.Close()
 	modules.KafkaCacheRegistry.StatusConsumer.Close()
 
