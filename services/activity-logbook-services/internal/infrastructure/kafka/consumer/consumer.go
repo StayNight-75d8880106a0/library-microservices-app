@@ -2,10 +2,13 @@ package consumer
 
 import (
 	"activity-logbook-services/internal/dto"
+	"activity-logbook-services/internal/helper"
 	"activity-logbook-services/internal/usecase"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"time"
 
@@ -23,7 +26,7 @@ func NewKafkaConsumer(brokerAddress []string, topic string, groupID string, user
 		Topic:                  topic,
 		GroupID:                groupID,
 		WatchPartitionChanges:  true,
-		PartitionWatchInterval: 5 * time.Millisecond,
+		PartitionWatchInterval: 5 * time.Second,
 		StartOffset:            kafka.FirstOffset,
 		MaxWait:                501 * time.Millisecond,
 		ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
@@ -37,8 +40,9 @@ func NewKafkaConsumer(brokerAddress []string, topic string, groupID string, user
 }
 
 const (
-	backoffMin = 1 * time.Second
-	backoffMax = 30 * time.Second
+	backoffMin  = 1 * time.Second
+	backoffMax  = 30 * time.Second
+	maxAttempts = 6
 )
 
 func (kfk *KafkaConsumer) StartConsuming(ctx context.Context) {
@@ -61,39 +65,27 @@ func (kfk *KafkaConsumer) StartConsuming(ctx context.Context) {
 				msg, errMsg := kfk.reader.FetchMessage(ctx)
 
 				if errMsg != nil {
+					if ctx.Err() != nil || errors.Is(errMsg, io.EOF) {
+						return
+					}
+
 					slog.Error("kafka consumer error",
 						"topic", kfk.reader.Config().Topic,
 						"group_id", kfk.reader.Config().GroupID,
 						"error", errMsg,
 					)
+
+					sleepWithContext(ctx, backoffMin)
 					continue
 				}
 
-				var eventUser dto.LogbookRequest
-
-				errUnmarshal := json.Unmarshal(msg.Value, &eventUser)
-
-				if errUnmarshal != nil {
-					slog.Error("kafka consumer error",
-						"topic", kfk.reader.Config().Topic,
-						"group_id", kfk.reader.Config().GroupID,
-						"error", errUnmarshal,
-					)
-					continue
+				if !kfk.processMessage(ctx, msg) {
+					return
 				}
 
-				errCreate := kfk.usecase.Create(ctx, &eventUser)
-
-				if errCreate != nil {
-					slog.Error("kafka consumer error",
-						"topic", kfk.reader.Config().Topic,
-						"group_id", kfk.reader.Config().GroupID,
-						"error", errCreate,
-					)
-					continue
-				}
-
-				errCommit := kfk.reader.CommitMessages(ctx, msg)
+				comitCTX, cancelConmmit := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+				errCommit := kfk.reader.CommitMessages(comitCTX, msg)
+				cancelConmmit()
 
 				if errCommit != nil {
 					slog.Error("kafka consumer error",
@@ -101,12 +93,72 @@ func (kfk *KafkaConsumer) StartConsuming(ctx context.Context) {
 						"group_id", kfk.reader.Config().GroupID,
 						"error", errCommit,
 					)
-					continue
 				}
 			}
 		}
 	}()
 
+}
+
+func (kfk *KafkaConsumer) processMessage(ctx context.Context, msg kafka.Message) bool {
+
+	var eventUser dto.LogbookRequest
+
+	errUnmarshal := json.Unmarshal(msg.Value, &eventUser)
+
+	if errUnmarshal != nil {
+		slog.Error("kafka consumer error",
+			"topic", kfk.reader.Config().Topic,
+			"group_id", kfk.reader.Config().GroupID,
+			"error", errUnmarshal,
+		)
+		return true
+	}
+
+	backoff := backoffMin
+
+	for attempt := 1; ; attempt++ {
+
+		errProcess := kfk.usecase.Create(ctx, &eventUser)
+
+		if errProcess == nil {
+			return true
+		}
+
+		if ctx.Err() != nil {
+			return false
+		}
+
+		var appErr *helper.AppError
+
+		isClientError := errors.As(errProcess, &appErr) && appErr.Code >= 400 && appErr.Code < 500
+
+		if isClientError || attempt >= maxAttempts {
+			slog.Error("kafka consumer error",
+				"topic", kfk.reader.Config().Topic,
+				"group_id", kfk.reader.Config().GroupID,
+				"error", errProcess,
+			)
+			return true
+		}
+
+		slog.Warn("kafka message retry", "offset", msg.Offset, "attempt", attempt, "error", errProcess)
+
+		if !sleepWithContext(ctx, backoff) {
+			return false
+		}
+
+		backoff = min(backoff*2, backoffMax)
+	}
+}
+
+func sleepWithContext(ctx context.Context, duration time.Duration) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(duration):
+		return true
+	}
 }
 
 func (kfk *KafkaConsumer) Close() error {

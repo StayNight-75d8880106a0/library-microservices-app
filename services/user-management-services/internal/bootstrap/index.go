@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 	"user-management-services/internal/config"
 	"user-management-services/internal/database"
@@ -22,8 +25,8 @@ func InitApp() {
 
 	gin.SetMode(gin.ReleaseMode)
 
-	ctx, cancelConsumer := context.WithCancel(context.Background())
-	defer cancelConsumer()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	appConfig := config.NewAppConfig()
 

@@ -10,6 +10,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
@@ -22,8 +25,8 @@ func InitApp() {
 
 	appConfig := config.NewAppConfig()
 
-	ctx, cancelConsumer := context.WithCancel(context.Background())
-	defer cancelConsumer()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	errDatabase := database.Connect()
 

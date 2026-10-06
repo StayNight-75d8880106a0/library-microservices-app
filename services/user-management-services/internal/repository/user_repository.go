@@ -5,6 +5,7 @@ import (
 	"user-management-services/internal/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UserRepositoryInterface interface {
@@ -25,7 +26,12 @@ func NewUserRepositoryRegistry(db *gorm.DB) *UserRepository {
 
 func (repo *UserRepository) CreateUserFromEvent(ctx context.Context, user *models.Users) error {
 
-	errCreate := repo.DB.WithContext(ctx).Table("user_profiles").Create(&user).Error
+	errCreate := repo.DB.WithContext(ctx).Table("user_profiles").
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "keycloak_user_id"}},
+			DoNothing: true,
+		}).
+		Create(&user).Error
 
 	return errCreate
 

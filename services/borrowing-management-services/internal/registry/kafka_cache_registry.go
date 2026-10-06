@@ -29,9 +29,9 @@ func NewKafkaCacheRegistryModule(rds *redis.Client, cfg *config.AppConfig) *Kafk
 
 	eventHandler := event.NewEventHandler(userCacheRepo, userGrpcClient)
 
-	authConsumer := consume.NewKafkaConsumer(cfg.Kafka.Brokers, cfg.Kafka.TopicUserAuthenticated+"-auth", cfg.Kafka.GroupID, eventHandler)
+	authConsumer := consume.NewKafkaConsumer(cfg.Kafka.Brokers, cfg.Kafka.TopicUserAuthenticated, cfg.Kafka.GroupID+"-auth", eventHandler)
 
-	statusConsumer := consume.NewKafkaConsumer(cfg.Kafka.Brokers, cfg.Kafka.TopicUserStatusUpdated+"-status", cfg.Kafka.GroupID, eventHandler)
+	statusConsumer := consume.NewKafkaConsumer(cfg.Kafka.Brokers, cfg.Kafka.TopicUserStatusUpdated, cfg.Kafka.GroupID+"-status", eventHandler)
 
 	return &KafkaCacheRegistryModule{
 		UserCacheRepo:  userCacheRepo,
