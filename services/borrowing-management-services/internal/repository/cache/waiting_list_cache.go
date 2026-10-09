@@ -26,6 +26,8 @@ func NewWaitingListCacheRepository(base repository.WaitingListRepositoryInterfac
 	}
 }
 
+const waitingListCachePrefix = "waitingList:v1:"
+
 func (repo *WaitingListCacheRepository) Create(ctx context.Context, data *models.WaitingList) error {
 	return repo.base.Create(ctx, data)
 }
@@ -40,7 +42,7 @@ func (repo *WaitingListCacheRepository) GetALLMyWaitingList(ctx context.Context,
 
 func (repo *WaitingListCacheRepository) GetWaitingListByID(ctx context.Context, ID string) (*models.WaitingList, error) {
 
-	cacheKey := "waitinglist:" + ID
+	cacheKey := waitingListCachePrefix + ID
 
 	cachedData, errCache := repo.rds.Get(ctx, cacheKey).Result()
 
@@ -49,11 +51,12 @@ func (repo *WaitingListCacheRepository) GetWaitingListByID(ctx context.Context, 
 
 		errJson := json.Unmarshal([]byte(cachedData), &waitingList)
 
-		if errJson != nil {
-			return nil, errJson
-		} else {
+		if errJson == nil {
 			return &waitingList, nil
 		}
+
+		log.Println("Corrupted cache, deleting key:", cacheKey, errJson)
+		repo.rds.Del(ctx, cacheKey)
 	}
 
 	log.Println("Cache MISS or Redis Down. Fetching from DB for ID:", ID)
@@ -87,7 +90,7 @@ func (repo *WaitingListCacheRepository) UpdateStatusWaitingList(ctx context.Cont
 	rowsAffected, err := repo.base.UpdateStatusWaitingList(ctx, ID, from, to)
 
 	if err == nil && repo.rds != nil {
-		cacheKey := "waitinglist:" + ID
+		cacheKey := waitingListCachePrefix + ID
 		repo.rds.Del(ctx, cacheKey)
 	}
 
@@ -107,7 +110,7 @@ func (repo *WaitingListCacheRepository) CancelWaitingListByUser(ctx context.Cont
 	rowsAffected, err := repo.base.CancelWaitingListByUser(ctx, ID, userID)
 
 	if err == nil && repo.rds != nil {
-		cacheKey := "waitinglist:" + ID
+		cacheKey := waitingListCachePrefix + ID
 		repo.rds.Del(ctx, cacheKey)
 	}
 
@@ -118,12 +121,27 @@ func (repo *WaitingListCacheRepository) GetExpiredWaitingLists(ctx context.Conte
 	return repo.base.GetExpiredWaitingLists(ctx, expiredHours)
 }
 
-func (repo *WaitingListCacheRepository) MarkFulfilledWaitingList(ctx context.Context, userID string, bookID string) (int64, error) {
-	return repo.base.MarkFulfilledWaitingList(ctx, userID, bookID)
+func (repo *WaitingListCacheRepository) MarkFulfilledWaitingList(ctx context.Context, userID string, bookID string) (string, error) {
+
+	claimedID, err := repo.base.MarkFulfilledWaitingList(ctx, userID, bookID)
+
+	if err == nil && claimedID != "" && repo.rds != nil {
+		repo.rds.Del(ctx, waitingListCachePrefix+claimedID)
+	}
+
+	return claimedID, err
 }
 
-func (repo *WaitingListCacheRepository) RevertFulfilledWaitingList(ctx context.Context, userID string, bookID string) error {
-	return repo.base.RevertFulfilledWaitingList(ctx, userID, bookID)
+func (repo *WaitingListCacheRepository) RevertFulfilledWaitingList(ctx context.Context, ID string) error {
+
+	err := repo.base.RevertFulfilledWaitingList(ctx, ID)
+
+	if err == nil && repo.rds != nil {
+		repo.rds.Del(ctx, waitingListCachePrefix+ID)
+	}
+
+	return err
+
 }
 
 func (repo *WaitingListCacheRepository) CountNotifiedWaitingListsByBookID(ctx context.Context, bookID string) (int64, error) {

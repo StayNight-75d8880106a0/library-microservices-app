@@ -26,6 +26,8 @@ func NewBorrowingUserCacheRepository(base repository.BorrowingUserRepositoryInte
 	}
 }
 
+const borrowingCachePrefix = "borrowing:v1:"
+
 func (repo *BorrowingUserCacheRepository) CreateBorrowing(ctx context.Context, borrowing *models.Borrowing) error {
 	return repo.base.CreateBorrowing(ctx, borrowing)
 }
@@ -40,7 +42,7 @@ func (repo *BorrowingUserCacheRepository) GetAllBorrowings(ctx context.Context, 
 
 func (repo *BorrowingUserCacheRepository) GetBorrowingByID(ctx context.Context, ID string) (*models.Borrowing, error) {
 
-	cacheKey := "borrowing:" + ID
+	cacheKey := borrowingCachePrefix + ID
 
 	cachedData, errCache := repo.rds.Get(ctx, cacheKey).Result()
 
@@ -49,11 +51,12 @@ func (repo *BorrowingUserCacheRepository) GetBorrowingByID(ctx context.Context, 
 
 		errJson := json.Unmarshal([]byte(cachedData), &borrowing)
 
-		if errJson != nil {
-			return nil, errJson
-		} else {
+		if errJson == nil {
 			return &borrowing, nil
 		}
+
+		log.Println("Corrupted cache, deleting key:", cacheKey, errJson)
+		repo.rds.Del(ctx, cacheKey)
 	}
 
 	log.Println("Cache MISS or Redis Down. Fetching from DB for ID:", ID)
@@ -88,7 +91,7 @@ func (repo *BorrowingUserCacheRepository) UpdateStatus(ctx context.Context, ID s
 	err := repo.base.UpdateStatus(ctx, ID, status)
 
 	if err == nil && repo.rds != nil {
-		cacheKey := "borrowing:" + ID
+		cacheKey := borrowingCachePrefix + ID
 		repo.rds.Del(ctx, cacheKey)
 	}
 

@@ -112,7 +112,7 @@ func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.Cre
 		return nil, helper.NewInternalServerError("An Error During Mark Fulfilled Waiting List!", helper.ErrorDetail{Detail: errClaim.Error()})
 	}
 
-	if claimed == 0 {
+	if claimed == "" {
 		notifiedCount, errCount := u.waitingListRepository.CountNotifiedWaitingListsByBookID(ctx, *request.BookID)
 
 		if errCount != nil {
@@ -135,8 +135,8 @@ func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.Cre
 	errCreate := u.repository.CreateBorrowing(ctx, borrowing)
 
 	if errCreate != nil {
-		if claimed > 0 {
-			errRevert := u.waitingListRepository.RevertFulfilledWaitingList(ctx, userID, *request.BookID)
+		if claimed != "" {
+			errRevert := u.waitingListRepository.RevertFulfilledWaitingList(ctx, claimed)
 
 			if errRevert != nil {
 				log.Printf("[WaitingList] Failed to restore the queue status of book %s for user %s: %v", *request.BookID, userID, errRevert)

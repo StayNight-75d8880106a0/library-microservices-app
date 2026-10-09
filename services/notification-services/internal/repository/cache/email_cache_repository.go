@@ -26,6 +26,8 @@ func NewEmailCacheRepository(base repository.EmailRepositoryInterface, rds *redi
 	}
 }
 
+const emailLogCachePrefix = "emailLog:v1:"
+
 func (repo *EmailCacheRepository) SaveEmailLog(ctx context.Context, emailLog *models.EmailLogs) error {
 	return repo.base.SaveEmailLog(ctx, emailLog)
 }
@@ -36,7 +38,7 @@ func (repo *EmailCacheRepository) GetAllEmailLogs(ctx context.Context, limit int
 
 func (repo *EmailCacheRepository) GetEmailLogByID(ctx context.Context, ID string) (*models.EmailLogs, error) {
 
-	cacheKey := "emailLog:" + ID
+	cacheKey := emailLogCachePrefix + ID
 
 	cachedData, errCache := repo.rds.Get(ctx, cacheKey).Result()
 
@@ -45,11 +47,12 @@ func (repo *EmailCacheRepository) GetEmailLogByID(ctx context.Context, ID string
 
 		errJson := json.Unmarshal([]byte(cachedData), &emailLog)
 
-		if errJson != nil {
-			return nil, errJson
-		} else {
+		if errJson == nil {
 			return &emailLog, nil
 		}
+
+		log.Println("Corrupted cache, deleting key:", cacheKey, errJson)
+		repo.rds.Del(ctx, cacheKey)
 	}
 
 	log.Println("Cache MISS or Redis Down. Fetching from DB for ID:", ID)

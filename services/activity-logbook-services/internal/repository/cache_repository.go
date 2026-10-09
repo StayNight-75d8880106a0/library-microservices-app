@@ -25,8 +25,18 @@ func NewLogbookCacheRepository(base LogbookRepositoryInterface, rds *redis.Clien
 	}
 }
 
+const logbookCachePrefix = "logbook:v1:trace:"
+
 func (repo *LogbookCacheRepository) Create(ctx context.Context, logbook *models.Logbook) error {
-	return repo.base.Create(ctx, logbook)
+
+	err := repo.base.Create(ctx, logbook)
+
+	if err == nil && repo.rds != nil && logbook.TraceID != nil {
+		repo.rds.Del(ctx, logbookCachePrefix+*logbook.TraceID)
+	}
+
+	return err
+
 }
 
 func (repo *LogbookCacheRepository) GetAll(ctx context.Context, limit int, cursorOccurredAt *time.Time, cursorID *string) ([]models.Logbook, error) {
@@ -35,7 +45,7 @@ func (repo *LogbookCacheRepository) GetAll(ctx context.Context, limit int, curso
 
 func (repo *LogbookCacheRepository) GetByTraceID(ctx context.Context, traceID string) ([]models.Logbook, error) {
 
-	cacheKey := "logbook:trace:" + traceID
+	cacheKey := logbookCachePrefix + traceID
 
 	cachedData, errCache := repo.rds.Get(ctx, cacheKey).Result()
 
@@ -44,11 +54,12 @@ func (repo *LogbookCacheRepository) GetByTraceID(ctx context.Context, traceID st
 
 		errJson := json.Unmarshal([]byte(cachedData), &logbooks)
 
-		if errJson != nil {
-			return nil, errJson
-		} else {
+		if errJson == nil {
 			return logbooks, nil
 		}
+
+		log.Println("Corrupted cache, deleting key:", cacheKey, errJson)
+		repo.rds.Del(ctx, cacheKey)
 	}
 
 	log.Println("Cache MISS or Redis Down. Fetching from DB for Trace ID:", traceID)
@@ -80,7 +91,7 @@ func (repo *LogbookCacheRepository) GetByTraceID(ctx context.Context, traceID st
 
 func (repo *LogbookCacheRepository) GetByID(ctx context.Context, ID string, traceID string) (*models.Logbook, error) {
 
-	cacheKey := "logbook:trace:" + traceID + ":id:" + ID
+	cacheKey := logbookCachePrefix + traceID + ":id:" + ID
 
 	cachedData, errCache := repo.rds.Get(ctx, cacheKey).Result()
 
@@ -89,11 +100,12 @@ func (repo *LogbookCacheRepository) GetByID(ctx context.Context, ID string, trac
 
 		errJson := json.Unmarshal([]byte(cachedData), &logbook)
 
-		if errJson != nil {
-			return nil, errJson
-		} else {
+		if errJson == nil {
 			return &logbook, nil
 		}
+
+		log.Println("Corrupted cache, deleting key:", cacheKey, errJson)
+		repo.rds.Del(ctx, cacheKey)
 	}
 
 	log.Println("Cache MISS or Redis Down. Fetching from DB for ID:", ID)

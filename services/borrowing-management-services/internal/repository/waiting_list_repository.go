@@ -21,8 +21,8 @@ type WaitingListRepositoryInterface interface {
 	GetFirstWaitingListByBookID(ctx context.Context, bookID string) (*models.WaitingList, error)
 	CancelWaitingListByUser(ctx context.Context, ID string, userID string) (int64, error)
 	GetExpiredWaitingLists(ctx context.Context, expiredHours int) ([]models.WaitingList, error)
-	MarkFulfilledWaitingList(ctx context.Context, userID string, bookID string) (int64, error)
-	RevertFulfilledWaitingList(ctx context.Context, userID string, bookID string) error
+	MarkFulfilledWaitingList(ctx context.Context, userID string, bookID string) (string, error)
+	RevertFulfilledWaitingList(ctx context.Context, ID string) error
 	CountNotifiedWaitingListsByBookID(ctx context.Context, bookID string) (int64, error)
 }
 
@@ -198,21 +198,46 @@ func (repo *WaitingListRepository) GetExpiredWaitingLists(ctx context.Context, e
 
 }
 
-func (repo *WaitingListRepository) MarkFulfilledWaitingList(ctx context.Context, userID string, bookID string) (int64, error) {
+func (repo *WaitingListRepository) MarkFulfilledWaitingList(ctx context.Context, userID string, bookID string) (string, error) {
 
-	result := repo.DB.WithContext(ctx).Table("waiting_lists").Where("user_id = ? AND book_id = ? AND status = ?", userID, bookID, models.WaitingListStatusNotified).Updates(map[string]interface{}{
-		"status":     models.WaitingListStatusFulfilled,
-		"updated_at": gorm.Expr("NOW()"),
-	})
+	var waitingList models.WaitingList
 
-	return result.RowsAffected, result.Error
+	errFind := repo.DB.WithContext(ctx).Table("waiting_lists").Select("id").
+		Where("user_id = ? AND book_id = ? AND status = ?", userID, bookID, models.WaitingListStatusNotified).
+		Take(&waitingList).Error
+
+	if errFind != nil {
+		if errors.Is(errFind, gorm.ErrRecordNotFound) {
+			return "", nil
+		}
+		return "", errFind
+	}
+
+	result := repo.DB.WithContext(ctx).Table("waiting_lists").Where("id = ? AND status = ?", waitingList.ID, models.WaitingListStatusNotified).
+		Updates(map[string]interface{}{
+			"status":     models.WaitingListStatusFulfilled,
+			"updated_at": gorm.Expr("NOW()"),
+		})
+
+	if result.Error != nil {
+		return "", result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return "", nil
+	}
+
+	return waitingList.ID, nil
+
 }
 
-func (repo *WaitingListRepository) RevertFulfilledWaitingList(ctx context.Context, userID string, bookID string) error {
+func (repo *WaitingListRepository) RevertFulfilledWaitingList(ctx context.Context, ID string) error {
 
-	err := repo.DB.WithContext(ctx).Table("waiting_lists").Where("user_id = ? AND book_id = ? AND status = ?", userID, bookID, models.WaitingListStatusFulfilled).Updates(map[string]interface{}{"status": models.WaitingListStatusNotified,
-		"updated_at": gorm.Expr("NOW()"),
-	}).Error
+	err := repo.DB.WithContext(ctx).Table("waiting_lists").Where("id = ? AND status = ?", ID, models.WaitingListStatusFulfilled).
+		Updates(map[string]interface{}{
+			"status":     models.WaitingListStatusNotified,
+			"updated_at": gorm.Expr("NOW()"),
+		}).Error
 
 	return err
 

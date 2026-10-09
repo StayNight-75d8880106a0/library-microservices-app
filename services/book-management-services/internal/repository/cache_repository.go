@@ -26,13 +26,15 @@ func NewBookCacheRepository(base BookRepositoryInterface, rds *redis.Client, cfg
 	}
 }
 
+const bookCachePrefix = "book:v1:"
+
 func (repo *BookCacheRepository) Create(ctx context.Context, book *models.Books) error {
 	return repo.base.Create(ctx, book)
 }
 
 func (repo *BookCacheRepository) GetById(ctx context.Context, ID string) (*models.Books, error) {
 
-	cacheKey := "book:" + ID
+	cacheKey := bookCachePrefix + ID
 
 	cachedData, errCache := repo.rds.Get(ctx, cacheKey).Result()
 
@@ -41,11 +43,12 @@ func (repo *BookCacheRepository) GetById(ctx context.Context, ID string) (*model
 
 		errJson := json.Unmarshal([]byte(cachedData), &book)
 
-		if errJson != nil {
-			return nil, errJson
-		} else {
+		if errJson == nil {
 			return &book, nil
 		}
+
+		log.Println("Corrupted cache, deleting key:", cacheKey, errJson)
+		repo.rds.Del(ctx, cacheKey)
 	}
 
 	log.Println("Cache MISS or Redis Down. Fetching from DB for ID:", ID)
@@ -83,7 +86,7 @@ func (repo *BookCacheRepository) Delete(ctx context.Context, ID string) error {
 	err := repo.base.Delete(ctx, ID)
 
 	if err == nil && repo.rds != nil {
-		cacheKey := "book:" + ID
+		cacheKey := bookCachePrefix + ID
 
 		repo.rds.Del(ctx, cacheKey)
 	}
@@ -96,7 +99,7 @@ func (repo *BookCacheRepository) Update(ctx context.Context, book *models.Books,
 	err := repo.base.Update(ctx, book, ID)
 
 	if err == nil && repo.rds != nil {
-		cacheKey := "book:" + ID
+		cacheKey := bookCachePrefix + ID
 
 		repo.rds.Del(ctx, cacheKey)
 	}
@@ -110,7 +113,7 @@ func (repo *BookCacheRepository) UpdateAvaliableStock(ctx context.Context, ID st
 	err := repo.base.UpdateAvaliableStock(ctx, ID, quantity, action)
 
 	if err == nil && repo.rds != nil {
-		cacheKey := "book:" + ID
+		cacheKey := bookCachePrefix + ID
 
 		repo.rds.Del(ctx, cacheKey)
 	}
