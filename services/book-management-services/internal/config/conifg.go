@@ -125,6 +125,16 @@ func NewKafkaConfig() *KafkaConfig {
 	}
 }
 
+type GRPCConfig struct {
+	PORT string
+}
+
+func NewGRPCConfig() *GRPCConfig {
+	return &GRPCConfig{
+		PORT: os.Getenv("BOOK_MANAGEMENT_GRPC_PORT"),
+	}
+}
+
 type AppConfig struct {
 	PortConfig     *PortConfig
 	MySQLConfig    *MySQLConfig
@@ -133,6 +143,7 @@ type AppConfig struct {
 	Elasticsearch  *ElasticsearchConfig
 	OpenLibraryAPI *OpenLibraryAPIConfig
 	KafkaConfig    *KafkaConfig
+	GRPCConfig     *GRPCConfig
 }
 
 func NewAppConfig() *AppConfig {
@@ -152,5 +163,6 @@ func NewAppConfig() *AppConfig {
 		Elasticsearch:  NewElasticsearchConfig(),
 		OpenLibraryAPI: NewOpenLibraryAPIConfig(),
 		KafkaConfig:    NewKafkaConfig(),
+		GRPCConfig:     NewGRPCConfig(),
 	}
 }

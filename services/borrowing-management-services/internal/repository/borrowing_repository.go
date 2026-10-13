@@ -13,6 +13,8 @@ type BorrowingUserRepositoryInterface interface {
 	GetAllBorrowings(ctx context.Context, limit int, offset int) ([]models.Borrowing, int64, error)
 	GetBorrowingByID(ctx context.Context, ID string) (*models.Borrowing, error)
 	UpdateStatus(ctx context.Context, ID string, status models.BorrowingStatus) error
+	CountPendingBorrowingByBookID(ctx context.Context, bookID string) (int64, error)
+	HasActiveBorrowing(ctx context.Context, userID string, bookID string) (bool, error)
 }
 
 type BorrowingUserRepository struct {
@@ -94,4 +96,24 @@ func (repo *BorrowingUserRepository) UpdateStatus(ctx context.Context, ID string
 	errUpdate := repo.db.WithContext(ctx).Table("borrowings").Where("id = ?", ID).Updates(updateFields).Error
 
 	return errUpdate
+}
+
+func (repo *BorrowingUserRepository) CountPendingBorrowingByBookID(ctx context.Context, bookID string) (int64, error) {
+
+	var total int64
+
+	errCount := repo.db.WithContext(ctx).Table("borrowings").Where("book_id = ? AND status = ?", bookID, models.BorrowingStatusPending).Count(&total).Error
+
+	return total, errCount
+
+}
+
+func (repo *BorrowingUserRepository) HasActiveBorrowing(ctx context.Context, userID string, bookID string) (bool, error) {
+
+	var total int64
+
+	errCount := repo.db.WithContext(ctx).Table("borrowings").Where("active_slot = ?", userID+":"+bookID).Count(&total).Error
+
+	return total > 0, errCount
+
 }

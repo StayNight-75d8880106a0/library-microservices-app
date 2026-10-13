@@ -10,16 +10,20 @@ import (
 )
 
 type PortConfig struct {
-	PORT     string
-	GRPC     string
-	GRPCHOST string
+	PORT         string
+	GRPC         string
+	GRPCHOST     string
+	BOOKGRPC     string
+	BOOKGRPCHOST string
 }
 
 func NewPortConfig() *PortConfig {
 	return &PortConfig{
-		PORT:     os.Getenv("BORROWING_MANAGEMENT_PORT"),
-		GRPCHOST: os.Getenv("USER_MANAGEMENT_GRPC_HOST"),
-		GRPC:     os.Getenv("USER_MANAGEMENT_GRPC_PORT"),
+		PORT:         os.Getenv("BORROWING_MANAGEMENT_PORT"),
+		GRPCHOST:     os.Getenv("USER_MANAGEMENT_GRPC_HOST"),
+		GRPC:         os.Getenv("USER_MANAGEMENT_GRPC_PORT"),
+		BOOKGRPC:     os.Getenv("BOOK_MANAGEMENT_GRPC_PORT"),
+		BOOKGRPCHOST: os.Getenv("BOOK_MANAGEMENT_GRPC_HOST"),
 	}
 }
 

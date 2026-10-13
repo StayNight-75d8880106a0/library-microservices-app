@@ -3,6 +3,7 @@ package registry
 import (
 	"borrowing-management-services/internal/config"
 	"borrowing-management-services/internal/delivery/controller"
+	redisdb "borrowing-management-services/internal/infrastructure/redis"
 	"borrowing-management-services/internal/repository"
 	"borrowing-management-services/internal/repository/cache"
 	"borrowing-management-services/internal/usecase"
@@ -24,9 +25,11 @@ func NewWaitingListRegistryModule(db *gorm.DB, rds *redis.Client, cfg *config.Ap
 
 	cacheRepository := cache.NewWaitingListCacheRepository(repository, rds, cfg.RedisCacheConfig)
 
+	locker := redisdb.NewLocker(rds)
+
 	usecase := usecase.NewWaitingListUsecase(cacheRepository)
 
-	cronJob := cronjob.NewCronService(usecase, cron)
+	cronJob := cronjob.NewCronService(usecase, cron, locker)
 
 	controller := controller.NewWaitingListController(usecase)
 

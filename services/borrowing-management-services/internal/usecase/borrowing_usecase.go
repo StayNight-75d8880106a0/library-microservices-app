@@ -7,9 +7,11 @@ import (
 	"borrowing-management-services/internal/helper"
 	"borrowing-management-services/internal/infrastructure/kafka/event"
 	"borrowing-management-services/internal/infrastructure/kafka/producer"
+	redisdb "borrowing-management-services/internal/infrastructure/redis"
 	"borrowing-management-services/internal/models"
 	"borrowing-management-services/internal/repository"
 	"context"
+	"errors"
 	"log"
 	"math"
 	"strings"
@@ -21,7 +23,7 @@ import (
 )
 
 type BorrowingUsecaseInterface interface {
-	CreateBorrowing(ctx context.Context, request *dto.CreateBorrowingRequest, userID string) (*dto.BorrowingResponse, error)
+	CreateBorrowing(ctx context.Context, request *dto.CreateBorrowingRequest, userID string) (*dto.BorrowingResult, error)
 	GetAllBorrowings(ctx context.Context, limit int, page int, role bool, userID string) ([]dto.BorrowingResponse, helper.PaginationMeta, error)
 	GetBorrowingByID(ctx context.Context, ID string, role bool, userID string) (*dto.BorrowingResponse, error)
 	UpdateBorrowingStatus(ctx context.Context, ID string, request *dto.BorrowingUpdateRequest) error
@@ -34,9 +36,12 @@ type BorrowingUsecase struct {
 	cfg                   *config.AppConfig
 	userGrpc              client.UserGrpcClientInterface
 	waitingListRepository repository.WaitingListRepositoryInterface
+	bookGrpc              client.BookGrpcClientInterface
+	waitingListUsecase    WaitingListUsecaseInterface
+	locker                redisdb.LockerInterface
 }
 
-func NewBorrowingUsecase(borrowingRepository repository.BorrowingUserRepositoryInterface, userCache repository.UserRedisCacheInterface, kafkaProducer *producer.KafkaProducer, cfg *config.AppConfig, userGrpc client.UserGrpcClientInterface, waitingListRepository repository.WaitingListRepositoryInterface) *BorrowingUsecase {
+func NewBorrowingUsecase(borrowingRepository repository.BorrowingUserRepositoryInterface, userCache repository.UserRedisCacheInterface, kafkaProducer *producer.KafkaProducer, cfg *config.AppConfig, userGrpc client.UserGrpcClientInterface, waitingListRepository repository.WaitingListRepositoryInterface, bookGrpc client.BookGrpcClientInterface, waitingListUsecase WaitingListUsecaseInterface, locker redisdb.LockerInterface) *BorrowingUsecase {
 	return &BorrowingUsecase{
 		repository:            borrowingRepository,
 		userCache:             userCache,
@@ -44,10 +49,13 @@ func NewBorrowingUsecase(borrowingRepository repository.BorrowingUserRepositoryI
 		cfg:                   cfg,
 		userGrpc:              userGrpc,
 		waitingListRepository: waitingListRepository,
+		bookGrpc:              bookGrpc,
+		waitingListUsecase:    waitingListUsecase,
+		locker:                locker,
 	}
 }
 
-func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.CreateBorrowingRequest, userID string) (*dto.BorrowingResponse, error) {
+func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.CreateBorrowingRequest, userID string) (*dto.BorrowingResult, error) {
 
 	if request.BookID == nil || *request.BookID == "" {
 		return nil, helper.NewUnprocessableEntityError("Book Cannot Be Empty!", helper.ErrorDetail{Detail: "Book ID is required!"})
@@ -106,6 +114,27 @@ func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.Cre
 		calculateDueDate = userDueDate
 	}
 
+	lockKey := "lock:borrow:v1:" + *request.BookID
+
+	releaseLock, errLock := u.locker.AcquireWithRetry(ctx, lockKey, 10*time.Second, 3, 51*time.Millisecond)
+
+	if errLock != nil {
+		if errors.Is(errLock, redisdb.ErrLockNotAcquired) {
+			return nil, helper.NewConflictError(
+				"Book Is Being Processed!",
+				helper.ErrorDetail{Detail: "Another borrowing request for this book is in progress. Please try again in a moment."},
+			)
+		}
+
+		log.Printf("[Lock] Failed to acquire %s: %v", lockKey, errLock)
+		return nil, helper.NewServiceUnavailableError(
+			"Service Temporarily Unavailable!",
+			helper.ErrorDetail{Detail: "Cannot process borrowing right now. Please try again in a moment."},
+		)
+	}
+
+	defer releaseLock()
+
 	claimed, errClaim := u.waitingListRepository.MarkFulfilledWaitingList(ctx, userID, *request.BookID)
 
 	if errClaim != nil {
@@ -121,6 +150,16 @@ func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.Cre
 
 		if notifiedCount > 0 {
 			return nil, helper.NewForbiddenError("Waiting List Not Fulfilled!", helper.ErrorDetail{Detail: "You have not fulfilled your waiting list for this book. Please wait for your turn to borrow the book!"})
+		}
+
+		waitingList, errStock := u.joinWaitingListIfOutOfStock(ctx, userID, *request.BookID)
+
+		if errStock != nil {
+			return nil, errStock
+		}
+
+		if waitingList != nil {
+			return &dto.BorrowingResult{Borrowing: nil, WaitingList: waitingList}, nil
 		}
 	}
 
@@ -163,7 +202,7 @@ func (u *BorrowingUsecase) CreateBorrowing(ctx context.Context, request *dto.Cre
 		UpdatedAt:  helper.FormatTimeRFC3339Jakarta(borrowing.UpdatedAt),
 	}
 
-	return result, nil
+	return &dto.BorrowingResult{Borrowing: result, WaitingList: nil}, nil
 
 }
 
@@ -410,5 +449,48 @@ func (u *BorrowingUsecase) processNextWaitingUser(ctx context.Context, bookID st
 	}
 
 	return nil
+
+}
+
+func (u *BorrowingUsecase) joinWaitingListIfOutOfStock(ctx context.Context, userID string, bookID string) (*dto.WaitingListResponse, error) {
+
+	hasActive, errActive := u.repository.HasActiveBorrowing(ctx, userID, bookID)
+
+	if errActive != nil {
+		return nil, helper.NewInternalServerError("An Error During Check Active Borrowing!", helper.ErrorDetail{Detail: errActive.Error()})
+	}
+
+	if hasActive {
+		return nil, helper.NewConflictError("Active Borrowing Already Exists!", helper.ErrorDetail{Detail: "You already have an active borrowing for this book. Please return the book before borrowing it again!"})
+	}
+
+	availableStock, _, errGrpc := u.bookGrpc.GetBookStock(ctx, bookID)
+
+	if errGrpc != nil {
+		switch status.Code(errGrpc) {
+
+		case codes.NotFound:
+			return nil, helper.NewNotFoundError("Book Not Found!", helper.ErrorDetail{Detail: "Book with the given ID does not exist!"})
+
+		case codes.Unavailable, codes.DeadlineExceeded:
+			return nil, helper.NewServiceUnavailableError("Book Service Unavailable!", helper.ErrorDetail{Detail: "Cannot check book stock right now. Please try again in a moment."})
+
+		default:
+			log.Printf("[gRPC Error] get book stock %s: %v", bookID, errGrpc)
+			return nil, helper.NewInternalServerError("An Error During Get Book Stock!", helper.ErrorDetail{Detail: "Unexpected error while checking book stock."})
+		}
+	}
+
+	pendingCount, errCount := u.repository.CountPendingBorrowingByBookID(ctx, bookID)
+
+	if errCount != nil {
+		return nil, helper.NewInternalServerError("An Error During Count Pending Borrowings!", helper.ErrorDetail{Detail: errCount.Error()})
+	}
+
+	if int64(availableStock)-pendingCount > 0 {
+		return nil, nil
+	}
+
+	return u.waitingListUsecase.JoinWaitingList(ctx, userID, &dto.CreateWaitingListRequest{BookID: &bookID})
 
 }

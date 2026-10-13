@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"book-management-services/internal/config"
+	"book-management-services/internal/delivery/grpc"
 	"book-management-services/internal/delivery/middleware"
 	"book-management-services/internal/delivery/router/initrouter"
 	mysql "book-management-services/internal/infrastructure/database"
@@ -64,6 +65,14 @@ func InitApp() {
 	modules := initialregistry.NewInitRegistry(mysql.DB, redisdb.RDS, elasticsearch.ElasticseearchClient, appConfig)
 	initrouter.InitRouter(app, modules, jwks, appConfig)
 
+	grpcServer, errGrpcServer := grpc.NewGrpcServer(appConfig.GRPCConfig.PORT, modules.Book.BookRepository)
+
+	if errGrpcServer != nil {
+		log.Fatalf("Failed to initialize gRPC Server: %v", errGrpcServer)
+	}
+
+	grpcServer.Start()
+
 	modules.Book.BookConsumer.StartConsuming(ctx)
 	defer modules.Book.BookConsumer.Close()
 
@@ -84,4 +93,5 @@ func InitApp() {
 	srv.Shutdown(shutdownCtx)
 	auditProducer.Close()
 	modules.Book.BookConsumer.Close()
+	grpcServer.Stop()
 }

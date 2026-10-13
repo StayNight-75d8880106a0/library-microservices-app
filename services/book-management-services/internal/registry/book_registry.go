@@ -16,6 +16,7 @@ import (
 type BookModule struct {
 	BookController *controller.BookController
 	BookConsumer   *consumer.KafkaConsumer
+	BookRepository repository.BookRepositoryInterface
 }
 
 func NewBookModuleRegistry(db *gorm.DB, rds *redis.Client, elasticsearch *elasticsearch.Client, cfg *config.AppConfig) *BookModule {
@@ -37,6 +38,7 @@ func NewBookModuleRegistry(db *gorm.DB, rds *redis.Client, elasticsearch *elasti
 	return &BookModule{
 		BookController: controller,
 		BookConsumer:   kafkaConsumer,
+		BookRepository: bookRepository,
 	}
 
 }

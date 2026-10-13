@@ -44,6 +44,11 @@ func (c *BorrowingController) Create(ctx *gin.Context) {
 		return
 	}
 
+	if borrowing.WaitingList != nil {
+		helper.NewResponseGlobal(ctx, 202, "Book Out Of Stock, You Have Been Added To The Waiting List!", borrowing, nil, nil)
+		return
+	}
+
 	helper.NewResponseGlobal(ctx, 201, "Success Create Borrowing!", borrowing, nil, nil)
 
 }

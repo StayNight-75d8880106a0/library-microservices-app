@@ -23,3 +23,8 @@ type BorrowingResponse struct {
 type BorrowingUpdateRequest struct {
 	Status *string `json:"status" binding:"required"`
 }
+
+type BorrowingResult struct {
+	Borrowing   *BorrowingResponse   `json:"borrowing"`
+	WaitingList *WaitingListResponse `json:"waitingList"`
+}

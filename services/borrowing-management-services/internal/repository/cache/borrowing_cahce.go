@@ -98,3 +98,11 @@ func (repo *BorrowingUserCacheRepository) UpdateStatus(ctx context.Context, ID s
 	return err
 
 }
+
+func (repo *BorrowingUserCacheRepository) HasActiveBorrowing(ctx context.Context, userID string, bookID string) (bool, error) {
+	return repo.base.HasActiveBorrowing(ctx, userID, bookID)
+}
+
+func (repo *BorrowingUserCacheRepository) CountPendingBorrowingByBookID(ctx context.Context, bookID string) (int64, error) {
+	return repo.base.CountPendingBorrowingByBookID(ctx, bookID)
+}
