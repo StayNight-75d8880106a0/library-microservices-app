@@ -1,0 +1,262 @@
+global_rules:
+  - id: global-cors
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_methods: "*"
+        allow_headers: "Authorization,Content-Type,Accept,Origin,X-Requested-With"
+        max_age: 3600
+  - id: standard-too-many-request-response
+    plugins:
+      response-rewrite:
+        vars:
+          - ["status", "==", 429]
+        headers:
+          set:
+            Content-Type: "application/json; charset=utf-8"
+            Retry-After: "$sent_http_x_ratelimit_reset"
+        body: '{"responseCode":429,"responseMessage":"Too many requests!","data":null,"error":{"detail":"Exceeding the prescribed request limit necessitates a momentary deferral before reinitiation! Please try again later!"},"pagination":null}'
+  - id: global-rate-limit
+    plugins:
+      limit-count:
+        count: 300
+        time_window: 61
+        key_type: "var_combination"
+        key: "$remote_addr $http_authorization"
+        rejected_code: 429
+        show_limit_quota_header: true
+  - id: global-prometheus
+    plugins:
+      prometheus: {}
+  - id: system-capacity-guard
+    plugins:
+      limit-count:
+        count: 20000
+        time_window: 60
+        key_type: "constant"
+        key: "system-wide"
+        rejected_code: 503
+        policy: local
+        show_limit_quota_header: false
+
+routes:
+#Layer 2
+  - id: auth-login-route
+    uri: /api/v1/auth/login
+    priority: 100
+    methods: ["POST" , "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 5
+        time_window: 61
+        key_type: "var"
+        key: "remote_addr"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "auth-service:9091": 1
+  - id: auth-register-route
+    uri: /api/v1/auth/register
+    priority: 100
+    methods: ["POST", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 3
+        time_window: 61
+        key_type: "var"
+        key: "remote_addr"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "auth-service:9091": 1
+  - id: auth-resend-email-route
+    uri: /api/v1/auth/resend-email
+    priority: 100
+    methods: ["POST", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 2
+        time_window: 300
+        key_type: "var"
+        key: "remote_addr"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "auth-service:9091": 1
+  - id: auth-general-route
+    uri: /api/v1/auth/*
+    priority: 90
+    plugins:
+      limit-count:
+        count: 30
+        time_window: 61
+        key_type: "var"
+        key: "remote_addr"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "auth-service:9091": 1
+#Layer 3 Borrowing Management
+  - id: borrowing-transaction-route
+    uris:
+      - /api/v1/borrowing
+      - /api/v1/borrowing/waiting-list
+      - /api/v1/borrowing/*
+    priority: 100
+    methods: ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 1
+        time_window: 2
+        key_type: "var"
+        key: "http_authorization"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "borrowing-management-service:9390": 1
+  - id: borrowing-read-route
+    uri: /api/v1/borrowing*
+    priority: 80
+    methods: ["GET", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 60
+        time_window: 61
+        key_type: "var"
+        key: "http_authorization"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "borrowing-management-service:9390": 1
+#Layer 3 User Management
+  - id: user-sensitive-route
+    uris:
+      - /api/v1/user/my/password
+      - /api/v1/user/my/profile
+    priority: 100
+    methods: ["POST", "PUT", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 5
+        time_window: 61
+        key_type: "var"
+        key: "http_authorization"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "user-management-service:9190": 1
+  - id: user-admin-write-route
+    uri: /api/v1/user*
+    priority: 90
+    methods: ["POST", "PUT", "DELETE", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 15
+        time_window: 61
+        key_type: "var"
+        key: "http_authorization"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "user-management-service:9190": 1
+  - id: user-read-route
+    uri: /api/v1/user*
+    priority: 80
+    methods: ["GET", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 60
+        time_window: 61
+        key_type: "var"
+        key: "http_authorization"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "user-management-service:9190": 1
+#Layer 3 Book Management
+  - id: book-write-route
+    uri: /api/v1/book*
+    priority: 90
+    methods: ["POST", "PUT", "DELETE", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 15
+        time_window: 61
+        key_type: "var"
+        key: "http_authorization"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "book-management-service:9290": 1
+  - id: book-read-route
+    uri: /api/v1/book*
+    priority: 80
+    methods: ["GET", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 120
+        time_window: 61
+        key_type: "var"
+        key: "http_authorization"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "book-management-service:9290": 1
+#Layer 3 Notification Management
+  - id: notification-write-route
+    uri: /api/v1/notifications*
+    priority: 90
+    methods: ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 10
+        time_window: 61
+        key_type: "var"
+        key: "http_authorization"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "notification-service:9490": 1
+  - id: notification-read-route
+    uri: /api/v1/notifications*
+    priority: 80
+    methods: ["GET", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 60
+        time_window: 61
+        key_type: "var"
+        key: "http_authorization"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "notification-service:9490": 1
+  - id: logbook-read-route
+    uri: /api/v1/logbook*
+    priority: 80
+    methods: ["GET", "OPTIONS"]
+    plugins:
+      limit-count:
+        count: 60
+        time_window: 61
+        key_type: "var"
+        key: "http_authorization"
+        rejected_code: 429
+    upstream:
+      type: roundrobin
+      nodes:
+        "logbook-service:9590": 1
+#END

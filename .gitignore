@@ -55,7 +55,7 @@ Thumbs.db
 README-PRIBADI.md
 MIGRATION.md
 
-apisix_conf/
+# apisix_conf/
 
 # Data runtime Docker (akun mail docker-mailserver, dll)
 # Berisi hash password akun — jangan di-commit

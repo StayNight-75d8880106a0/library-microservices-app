@@ -1,0 +1,10 @@
+apisix:
+  enable_admin: false
+  status:
+    ip: 0.0.0.0
+    port: 7085
+
+deployment:
+  role: data_plane
+  role_data_plane:
+    config_provider: yaml
